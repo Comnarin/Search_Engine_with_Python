@@ -8,7 +8,7 @@ class AdditionTestCase(unittest.TestCase):
         test = sum_of_10_matrix()
         ans = test.Input()
         result = test.calculate()
-        assert result ==[4,10]
+        assert result == [4,10]
         
 class sum_of_10_matrix:
     def __init__(self) :
@@ -60,3 +60,4 @@ class sum_of_10_matrix:
                 columns.append(column)
                     
             Result.append(find_count(rows)+find_count(columns))
+        print(Result)
