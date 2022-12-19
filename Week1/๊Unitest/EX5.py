@@ -5,13 +5,14 @@ class Check_triple_TestCase(unittest.TestCase):
         assert result == [{0, 1, -1}, {0, 2, -2}, {0, -4, 4}, {0, 3, -3}, {4, -3, -1}, {3, -2, -1}, {1, 2, -3}, {1, 3, -4}]
     def test_threeargs(self):
         result = findtriple([1,2,3,4,5,6,7])
-        assert result == 'No Triplet Found'
+        assert result == "No_Triplet_Found"
 
     def test_noargs(self):
         result = findtriple([])
-        assert result == 'No Triplet Found'
+        assert result == "No_Triplet_Found"
 
 def findtriple(array):
+    Result =""
     found = False
     l=[]
     for i in range(len(array) - 1):
@@ -28,8 +29,10 @@ def findtriple(array):
             else:
                 s.add(array[j])
     if found == False:
-        print("No Triplet Found")
+        Result = "No_Triplet_Found"
     else:
-        print(l)
+        Result = l
+    return Result
+    
 if __name__ == "__main__":
     unittest.main()
