@@ -9,6 +9,28 @@ class AdditionTestCase(unittest.TestCase):
         result = test.Input()
         result = test.calculator()
         assert result == [4,10]
+
+    @patch('builtins.input',side_effect=['a'])
+    def test_atr(self, mock_inputs):
+        test = sum_of_10_matrix()
+        result = test.Input()
+        assert result == "Invalid time"
+
+    @patch('builtins.input',side_effect=[1,2,'1 1','1 1'])
+    def test_noResult(self, mock_inputs):
+        test = sum_of_10_matrix()
+        result = test.Input()
+        result = test.calculator()
+        assert result == []
+    
+    @patch('builtins.input',side_effect=[2,4,'1 2 3 4','1 2 3 4','1 2 3 4','1 2 3 4',
+                                            5,'2 2 2 2 2','2 2 2 2 2','2 2 2 2 2','2 2 2 2 2','2 2 2 2 2'])
+    def test_sum(self, mock_inputs):
+        test = sum_of_10_matrix()
+        result = test.Input()
+        result = test.calculator()
+        assert result == [4,10]
+   
         
 class sum_of_10_matrix():
     def __init__(self) :
@@ -18,7 +40,7 @@ class sum_of_10_matrix():
         self.size = []
         self.data_rows = []
         self.data_columns =[]
-        self.time = int(input("time : "))
+        self.time = int(input("time : "))    
         for i in range(self.time):
             matrix = int(input("Matrix : "))
             self.size.append(matrix)
