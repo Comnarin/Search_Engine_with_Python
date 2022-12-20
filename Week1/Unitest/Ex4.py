@@ -1,5 +1,9 @@
 import unittest
 class Check_repeat_TestCase(unittest.TestCase):
+    def test_oneDuplicate(self):
+        result = findDuplicates([1,1])
+        assert result == {1: {'count': 1, 'indices': [1]}}
+    
     def test_main(self):
         result = findDuplicates([1,2,3,4,5,6,1,2,7,8,9,7,9,1,2,4,2,2])
         assert result == {
@@ -9,22 +13,20 @@ class Check_repeat_TestCase(unittest.TestCase):
             4: {'count': 1, 'indices': [15]}
             }
 
-    def test_threeargs(self):
+    def test_noDuplicate(self):
         result = findDuplicates([1,2,3,4,5,6,7,8])
         assert result == {}
 
-    def test_noargs(self):
-        result = findDuplicates(a)
-        assert result == {}
+    def test_invalidArray(self):
+        result = findDuplicates('a')
+        assert result == "Invalid Array Type"
+    
 
 def findDuplicates(array):
     Table = {}
     duplicates = {}
-    try:
-        if not isinstance(array, list):
-            raise TypeError("Invalid Array Type")
-    except TypeError as error:
-        print(error)
+    if type(array) != list:
+        return("Invalid Array Type")
 
     for i in range(0, len(array)):
         if array[i] in Table:
