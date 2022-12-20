@@ -6,7 +6,6 @@ class AdditionTestCase(unittest.TestCase):
                                             5,'2 2 2 2 2','2 2 2 2 2','2 2 2 2 2','2 2 2 2 2','2 2 2 2 2'])
     def test_sum(self, mock_inputs):
         test = sum_of_10_matrix()
-        ans = test.Input()
         result = test.calculate()
         assert result == [4,10]
         
@@ -14,32 +13,13 @@ class sum_of_10_matrix:
     def __init__(self) :
         self.Result=[]
 
-    def Input(self):
+    def Input(self,column,rows,matrix):
+        self.value = []
         self.time = int(input("time : "))
-        self.matrix = int(input("Matrix : "))
         self.value = input('value : ')
-
-    def calculate(self,time,matrix,Result,value):
-        def find_count(matrix_value):
-                count = 0
-                for m in range (matrix):
-                    row = matrix_value[m]
-                    total = 0
-                    for j in range(len(row)) :
-                        if total == 10:
-                                count +=1
-                        total = 0
-                        
-                        for i in range(j,len(row)):
-                            if total == 10:
-                                count +=1
-                                total = 0
-                            elif total < 10:
-                                total+=row[i]
-                return count
-        for i in range(time):
-            matrix = int(input("Matrix : "))
-            value = []
+        for i in range(self.time):
+            self.matrix = int(input("Matrix : "))
+           
 
             for j in range(matrix):
                 value += value.split()
@@ -58,6 +38,27 @@ class sum_of_10_matrix:
                 for j in range(n):
                     column.append(rows[j][i])
                 columns.append(column)
-                    
-            Result.append(find_count(rows)+find_count(columns))
-        print(Result)
+
+    def calculate(self,rows,columns):
+        def find_count(matrix_value):
+                count = 0
+                for m in range (self.matrix):
+                    row = matrix_value[m]
+                    total = 0
+                    for j in range(len(row)) :
+                        if total == 10:
+                                count +=1
+                        total = 0
+                        
+                        for i in range(j,len(row)):
+                            if total == 10:
+                                count +=1
+                                total = 0
+                            elif total < 10:
+                                total+=row[i]
+                return count            
+        self.Result.append(find_count(self.rows)+find_count(self.columns))
+        print(self.Result)
+
+if __name__ == "__main__":
+    unittest.main()
