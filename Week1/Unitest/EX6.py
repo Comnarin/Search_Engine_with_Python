@@ -7,19 +7,19 @@ class AdditionTestCase(unittest.TestCase):
     def test_sum(self, mock_inputs):
         test = sum_of_10_matrix()
         result = test.Input()
+        result = test.calculator()
         assert result == [4,10]
         
 class sum_of_10_matrix():
     def __init__(self) :
         self.matrix = []
-        self.Input = []
+        self.Result = []
     def Input(self):
-        self.time = int(input("time : "))
         self.size = []
         self.data_rows = []
         self.data_columns =[]
-        time = int(input("time : "))
-        for i in range(time):
+        self.time = int(input("time : "))
+        for i in range(self.time):
             matrix = int(input("Matrix : "))
             self.size.append(matrix)
             value =[]
@@ -42,7 +42,7 @@ class sum_of_10_matrix():
             self.data_columns.append(columns)
         return self.data_rows,self.data_columns
         
-    def find_count(matrix_value,size):
+    def find_count(self,matrix_value,size):
             count = 0
             for m in range (size):
                 row = matrix_value[m]
@@ -61,9 +61,14 @@ class sum_of_10_matrix():
             return count
                 
     def calculator(self):
-        for i in self.size:
-            Result += (self.find_count(self.data_rows[i],self.size[i])+self.find_count(self.data_columns[i],self.size[i]))
-        return Result
+        
+        #print(self.time)
+        for i in range(self.time):
+            total = 0
+            total += (self.find_count(self.data_rows[i],self.size[i]))
+            total += (self.find_count(self.data_columns[i],self.size[i]))
+            self.Result.append(total)
+        return self.Result
 
 if __name__ == "__main__":
     unittest.main()
