@@ -4,7 +4,9 @@ from unittest.mock import patch, mock_open
 
 class Test_solve(unittest.TestCase):
     def test(self):
-        data = '''16 200 -10 
+        data = '''16 
+            200 
+            -10 
             12 
             70 
             1 
