@@ -1,19 +1,34 @@
 #"""16 200 -10 12 70 1 999 50 20 1000 150 300 200 90 900 40 140 130 30"""
 import unittest
 from unittest.mock import patch, mock_open
-with patch("builtins.open", mock_open(read_data="""16 200 -10 12 70 1 999 50 20 1000 150 300 200 90 900 40 140 130 30""")) as mock_file:
-    assert open("path/to/open").read() == """16 200 -10 12 70 1 999 50 20 1000 150 300 200 90 900 40 140 130 30"""
-mock_file.assert_called_with("path/to/open")
-@patch("builtins.open", new_callable=mock_open, read_data="""16 200 -10 12 70 1 999 50 20 1000 150 300 200 90 900 40 140 130 30""")
-def test_patch(mock_file):
-    test = solve()
-    result = test.readfile(mock_file)
-    result = test.calculate(mock_file)
-    assert result == """16 200 -10 12 70 1 999 50 20 1000 150 300 200 90 900 40 140 130 30"""
-    mock_file.assert_called_with("path/to/open")
+
+class Test_solve(unittest.TestCase):
+    def test(self):
+        data = '''16 200 -10 
+            12 
+            70 
+            1 
+            999 
+            50 
+            20 
+            1000 
+            150 
+            300 
+            200 
+            90 
+            900 
+            40 
+            140 
+            130 
+            30'''
+        with patch('__main__.open',mock_open(read_data=data)):
+            with open('fake_path') as h:
+                answer = calculate(readfile(h))
+        assert answer == (130, 70, 20, 150, 50, 40, 90, 30)
+
 #Ex7
-def solve():
-    def readfile(input_file):
+
+def readfile(input_file):
         lines = []
         with open(input_file, 'r') as file:
             for line in file:
@@ -21,7 +36,7 @@ def solve():
                 lines.append(line)
         return(lines)
 
-    def calculate(lines):
+def calculate(lines):
         x1,x2,x3,x4,x5,x6,x7,x8 = int,int,int,int,int,int,int,int
         c_values=lines[1:3]
         x_values=lines[3:]
@@ -49,7 +64,9 @@ def solve():
                                             x8_values = [x8 for x8 in x_values if x8 not in {x1, x2, x3, x4, x5, x6, x7}]
                                             for x8 in x8_values:
                                                 if x8 - x6 == c2 and x7 == x5 + x6:
-                                                    return(x1,x2,x3,x4,x5,x6,x7,x8)   
+                                                    return(x1,x2,x3,x4,x5,x6,x7,x8) 
+
+
 
 
 if __name__ == "__main__":
