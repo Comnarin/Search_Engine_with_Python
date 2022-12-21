@@ -9,27 +9,28 @@ class AdditionTestCase(unittest.TestCase):
         result = test.Input()
         result = test.calculator()
         assert result == [4,10]
-
-    @patch('builtins.input',side_effect=['a'])
-    def test_atr(self, mock_inputs):
-        test = sum_of_10_matrix()
-        result = test.Input()
-        assert result == "Invalid time"
-
-    @patch('builtins.input',side_effect=[1,2,'1 1','1 1'])
-    def test_noResult(self, mock_inputs):
-        test = sum_of_10_matrix()
-        result = test.Input()
-        result = test.calculator()
-        assert result == []
     
-    @patch('builtins.input',side_effect=[2,4,'1 2 3 4','1 2 3 4','1 2 3 4','1 2 3 4',
-                                            5,'2 2 2 2 2','2 2 2 2 2','2 2 2 2 2','2 2 2 2 2','2 2 2 2 2'])
-    def test_sum(self, mock_inputs):
+''' @patch('builtins.input',side_effect=[1,2,'1 2','1 2 '])
+    def test_noAnswer(self, mock_inputs):
         test = sum_of_10_matrix()
         result = test.Input()
         result = test.calculator()
-        assert result == [4,10]
+        assert result == [0]
+    
+    @patch('builtins.input',side_effect=[1,1,'1'])
+    def test_1metrix(self, mock_inputs):
+        test = sum_of_10_matrix()
+        result = test.Input()
+        result = test.calculator()
+        assert result == [0]
+    
+    @patch('builtins.input',side_effect=[0])
+    def test_0metrix(self, mock_inputs):
+        test = sum_of_10_matrix()
+        result = test.Input()
+        result = test.calculator()
+        assert result == []'''
+
    
         
 class sum_of_10_matrix():
