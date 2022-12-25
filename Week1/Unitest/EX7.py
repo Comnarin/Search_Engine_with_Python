@@ -27,6 +27,30 @@ class Test_solve(unittest.TestCase):
             with open('fake_path') as h:
                 answer = calculate(readfile(h))
         assert answer == (130, 70, 20, 150, 50, 40, 90, 30)
+    def test_noAnswer(self):
+        data = '''0 
+            200 
+            -10 
+            12 
+            70 
+            1 
+            999 
+            50 
+            20 
+            1000 
+            150 
+            300 
+            200 
+            90 
+            900 
+            40 
+            140 
+            130 
+            30'''
+        with patch('__main__.open',mock_open(read_data=data)):
+            with open('fake_path') as h:
+                answer = calculate(readfile(h))
+        assert answer == (130, 70, 20, 150, 50, 40, 90, 30)
 
 #Ex7
 
