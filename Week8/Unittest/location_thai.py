@@ -28,6 +28,7 @@ class location3(unittest.TestCase):
         
     def test_get_location1(self):
         self.assertEqual(self.Web_thai3.get_location(), "เลย")
+        
 class Thai:
     def __init__(self,data:list):
         self.data_value = data
@@ -86,6 +87,6 @@ class Thai:
         self.Result_location = filtered_input = [entry for entry in self.location_value if entry[1] == 'B-LOCATION']
         return self.Result_location #Output location Dict
     
-    
+
 if __name__ == '__main__':
     unittest.main()
