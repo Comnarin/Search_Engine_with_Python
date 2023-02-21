@@ -43,7 +43,7 @@ class Ui_MainWindow(object):
         # Connect to database and execute SELECT statement
         conn = sqlite3.connect(db_dir)
         cursor = conn.cursor()
-        cursor.execute('SELECT * FROM words')
+        cursor.execute('SELECT * FROM documents')
         data = cursor.fetchall()
 
         # Set column and row count for table
