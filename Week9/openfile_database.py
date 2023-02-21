@@ -104,8 +104,8 @@ class Ui_MainWindow(object):
             # create a QMessageBox object
             alert = QMessageBox()
             
-            # set the message box text and type of alert
-            alert.setText("It's is not my database")
+            # set the message box text and tyspe of alert
+            alert.setText("database doesn't match!")
             alert.setIcon(QMessageBox.Warning)
             
             # display the alert box
