@@ -9,7 +9,7 @@ from spacy.lang.en import English
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QInputDialog, QLineEdit, QListWidgetItem, QMessageBox
-
+from PyQt5.QtCore import QThread, pyqtSignal
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
@@ -135,7 +135,7 @@ class Ui_MainWindow(object):
 
         self.progressBar = QtWidgets.QProgressBar(self.tab_scrapping)
         self.progressBar.setLocale(QtCore.QLocale(QtCore.QLocale.English, QtCore.QLocale.UnitedStates))
-        self.progressBar.setProperty("value", 50)
+        self.progressBar.setProperty("value", 0)
         self.progressBar.setAlignment(QtCore.Qt.AlignCenter)
         self.progressBar.setObjectName("progressBar")
         self.verticalLayout_4.addWidget(self.progressBar)
@@ -218,27 +218,27 @@ class Ui_MainWindow(object):
 
     def clicked_start(self):
         self.textBrowser.clear()
-        Domain_list = []
+        self.textBrowser.append("Starting Scrap")
+        target_links = []
         for i in range(self.listWidget.count()):
             item = self.listWidget.item(i)
-            Domain_list.append(item.text())
+            target_links.append(item.text())
         depth_value = self.spinBox_Depth.value()
-        '''
-        print("Links = "+str(Domain_list))
-        
-        #print("depth = "+str(depth_value))
-        for i in Domain_list:
-            value = self.crawl(i,depth_value,0,set())
-            
-            print(value)'''
-        
-        for i in Domain_list:
-            web_spyder=spyder(Domain_list,i,depth_value)
-            domain_links,target_links =web_spyder.get_all()
-            #for i in domain_links:
-                
-        self.get_doc(Domain_list,depth_value)
-        #self.lcdNumber.display(len(domain_links))
+        self.thread = SpiderThread(target_links, depth_value)
+        self.thread.progress.connect(self.progress_ui)
+        self.thread.finished.connect(self.update_ui)
+        self.thread.start()
+
+    def progress_ui(self,i):
+        self.textBrowser.clear()
+        self.textBrowser.append(i)
+
+    def update_ui(self, domain_links):
+        self.textBrowser.clear()
+        for i in domain_links:
+            self.textBrowser.append(i)
+        self.lcdNumber.display(len(domain_links))
+        self.progressBar.setProperty("value", 100)
 
 
     def spacy_process(self,text):
@@ -358,7 +358,25 @@ class Ui_MainWindow(object):
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_Visualization), _translate("MainWindow", "Visualization"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_Search), _translate("MainWindow", "Search"))
 
-class spyder:
+class SpiderThread(QThread):
+    finished = pyqtSignal(list)
+    progress = pyqtSignal(str)
+    def __init__(self, target_links, depth_value):
+        super().__init__()
+        self.target_links = target_links
+        self.depth_value = depth_value
+
+    def run(self):
+        domain_links = []
+        for i in self.target_links:
+            web_spyder = spyder(self.target_links, i, self.depth_value)
+            domain_links.extend(web_spyder.get_crawler())
+            self.progress.emit(i)
+        self.finished.emit(domain_links)
+    def update_progress(self):
+        self.progress_updated.emit(1)  # emit signal to increment progress bar
+
+class spyder():
     def __init__( self ,links,base_url,depth ):
         self.base_url = base_url
         target_links={}
@@ -368,6 +386,7 @@ class spyder:
         self.depth = depth
     
     def get_crawler(self):
+        print("Crawler")
         self.result_crawler = self.crawl(self.base_url,self.depth,0,set())
         return self.result_crawler
     
