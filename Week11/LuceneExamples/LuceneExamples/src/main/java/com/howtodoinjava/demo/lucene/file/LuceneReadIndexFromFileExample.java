@@ -17,7 +17,7 @@ import org.apache.lucene.store.FSDirectory;
 public class LuceneReadIndexFromFileExample 
 {
     //directory contains the lucene indexes
-    private static final String INDEX_DIR = "C:/Users/Nattavee Narischat/Downloads/LuceneExamples/LuceneExamples/indexedFiles";
+    private static final String INDEX_DIR = "/Users/narin/Documents/Kmutnb/Year2/S2/Softdev2/Exercise/softdev2/Week11/LuceneExamples/LuceneExamples/indexedFiles";
  
     public static void main(String[] args) throws Exception 
     {
@@ -25,7 +25,7 @@ public class LuceneReadIndexFromFileExample
         IndexSearcher searcher = createSearcher();
          
         //Search indexed contents using search term
-        TopDocs foundDocs = searchInContent("agreeable", searcher);
+        TopDocs foundDocs = searchInContent("discove", searcher);
          
         //Total found documents
         System.out.println("Total Results :: " + foundDocs.totalHits);

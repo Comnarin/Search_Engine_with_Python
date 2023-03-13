@@ -16,7 +16,7 @@ import org.apache.lucene.store.FSDirectory;
 
 public class LuceneWriteIndexExample 
 {
-	private static final String INDEX_DIR = "c:/temp/lucene6index";
+	private static final String INDEX_DIR = "/Users/narin/Documents/Kmutnb/Year2/S2/Softdev2/Exercise/softdev2/Week11/LuceneExamples/LuceneExamples/indexedFiles";
 
 	public static void main(String[] args) throws Exception 
 	{

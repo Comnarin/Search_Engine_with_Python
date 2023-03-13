@@ -29,10 +29,10 @@ public class LuceneWriteIndexFromFileExample
     public static void main(String[] args)
     {
         //Input folder
-        String docsPath = "C:/Users/Nattavee Narischat/Downloads/LuceneExamples/LuceneExamples/inputFiles";
+        String docsPath = "/Users/narin/Documents/Kmutnb/Year2/S2/Softdev2/Exercise/softdev2/Week11/LuceneExamples/LuceneExamples/inputFiles";
          
         //Output folder
-        String indexPath = "C:/Users/Nattavee Narischat/Downloads/LuceneExamples/LuceneExamples/indexedFiles";
+        String indexPath = "/Users/narin/Documents/Kmutnb/Year2/S2/Softdev2/Exercise/softdev2/Week11/LuceneExamples/LuceneExamples/indexedFiles";
  
         //Input Path Variable
         final Path docDir = Paths.get(docsPath);
