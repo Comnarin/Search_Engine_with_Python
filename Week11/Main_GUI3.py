@@ -225,7 +225,7 @@ class Ui_MainWindow(object):
             target_links.append(item.text())
         depth_value = self.spinBox_Depth.value()
         self.thread = SpiderThread(target_links, depth_value)
-        self.thread.progress.connect(self.progress_ui)
+        self.thread.progress_signal.connect(self.progress_ui)
         self.thread.finished.connect(self.update_ui)
         self.thread.start()
 
@@ -360,7 +360,7 @@ class Ui_MainWindow(object):
 
 class SpiderThread(QThread):
     finished = pyqtSignal(list)
-    progress = pyqtSignal(str)
+    progress_signal = pyqtSignal(str)
     def __init__(self, target_links, depth_value):
         super().__init__()
         self.target_links = target_links
@@ -369,52 +369,27 @@ class SpiderThread(QThread):
     def run(self):
         domain_links = []
         for i in self.target_links:
-            web_spyder = spyder(self.target_links, i, self.depth_value)
+            web_spyder = spyder(self.target_links, i, self.depth_value, self.progress_signal)  # <-- pass progress_signal to spyder
             domain_links.extend(web_spyder.get_crawler())
-            self.progress.emit(i)
         self.finished.emit(domain_links)
-    def update_progress(self):
-        self.progress_updated.emit(1)  # emit signal to increment progress bar
+
 
 class spyder():
-    def __init__( self ,links,base_url,depth ):
+    def __init__(self, links, base_url, depth, progress_signal):
+        self.progress_signal = progress_signal # store progress signal
         self.base_url = base_url
-        target_links={}
+        target_links = {}
         for i in links:
-            target_links[i]=0 
+            target_links[i] = 0
         self.target_links = target_links
         self.depth = depth
-    
-    def get_crawler(self):
-        print("Crawler")
-        self.result_crawler = self.crawl(self.base_url,self.depth,0,set())
-        return self.result_crawler
-    
-    def get_check_domain(self):
-        self.check_domain_result = self.check_domain(self.base_url,self.get_crawler())
-        return self.check_domain_result
-    
-    def get_check_not_domain(self):
-        self.check_not_domain_result = self.check_not_domain(self.base_url,self.get_crawler())   
-        return self.check_not_domain_result
-    
-    def get_check_ref(self):
-        self.check_ref_result = self.check_ref(self.get_check_not_domain(),self.target_links)
-        return self.check_ref_result
-    
-    def get_all(self):
-        crawl = self.crawl(self.base_url,self.depth,0,set())
-        check_domain =  self.check_domain(self.base_url,crawl) 
-        check_not_domain = self.check_not_domain(self.base_url,crawl)
-        check_ref = self.check_ref(check_not_domain,self.target_links)
-        return check_domain,check_ref
-    
-    def crawl(self,url,n, depth,visited):
-        if depth < n :
+
+    def crawl(self, url, n, depth, visited):
+        if depth < n:
             visited.add(url)
             headers = {'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246"}
             time.sleep(0.3)
-            response = requests.get(url,headers=headers)
+            response = requests.get(url, headers=headers)
             try:
                 soup = BeautifulSoup(response.text, 'html.parser')
             except:
@@ -425,11 +400,36 @@ class spyder():
 
             for link in links:
                 if link not in visited:
-                    link = link.replace(' ','')
+                    link = link.replace(' ', '')
                     visited.add(link)
                     if link.startswith(url):
-                        self.crawl(link,n=n,depth=depth+1, visited=visited)
+                        self.crawl(link, n=n, depth=depth+1, visited=visited)
+                    self.progress_signal.emit(link) # emit progress signal here
         return visited
+
+    def get_crawler(self):
+        self.result_crawler = self.crawl(self.base_url, self.depth, 0, set())
+        return self.result_crawler
+
+    def get_check_domain(self):
+        self.check_domain_result = self.check_domain(self.base_url, self.get_crawler())
+        return self.check_domain_result
+
+    def get_check_not_domain(self):
+        self.check_not_domain_result = self.check_not_domain(self.base_url, self.get_crawler())
+        return self.check_not_domain_result
+
+    def get_check_ref(self):
+        self.check_ref_result = self.check_ref(self.get_check_not_domain(), self.target_links)
+        return self.check_ref_result
+
+    def get_all(self):
+        crawl = self.crawl(self.base_url, self.depth, 0, set())
+        check_domain = self.check_domain(self.base_url, crawl)
+        check_not_domain = self.check_not_domain(self.base_url, crawl)
+        check_ref = self.check_ref(check_not_domain, self.target_links)
+        return check_domain, check_ref
+
     
     def check_domain(self,base_url,links):
         result= set()
