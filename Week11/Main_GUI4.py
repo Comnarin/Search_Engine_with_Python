@@ -1,7 +1,19 @@
+import requests
+from bs4 import BeautifulSoup
+import time
+from urllib.parse import urljoin
 
-
+import spacy
+from spacy.tokenizer import Tokenizer
+from spacy.lang.en import English
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtWidgets import QInputDialog, QLineEdit, QListWidgetItem, QMessageBox,QFileDialog,QHeaderView
+from PyQt5.QtCore import QThread, pyqtSignal
+
+from PyQt5 import QtCore, QtGui, QtWidgets
+import math
+import sqlite3
 
 
 class Ui_MainWindow(object):
@@ -127,6 +139,7 @@ class Ui_MainWindow(object):
         self.Button_openfile.setFont(font)
         self.Button_openfile.setLayoutDirection(QtCore.Qt.LeftToRight)
         self.Button_openfile.setObjectName("Button_openfile")
+        self.Button_openfile.clicked.connect(self.openFileNameDialog)
         self.verticalLayout_3.addWidget(self.Button_openfile)
         self.label_data_view = QtWidgets.QLabel(self.tab_view)
         font = QtGui.QFont()
@@ -149,11 +162,13 @@ class Ui_MainWindow(object):
         font.setPointSize(10)
         self.pushButton_2.setFont(font)
         self.pushButton_2.setObjectName("pushButton_2")
+        self.pushButton_2.clicked.connect(self.search_input)
         self.verticalLayout_3.addWidget(self.splitter)
         self.table_view = QtWidgets.QTableWidget(self.tab_view)
         self.table_view.setObjectName("table_view")
         self.table_view.setColumnCount(0)
         self.table_view.setRowCount(0)
+        self.table_view.horizontalHeader().setVisible(True)
         self.verticalLayout_3.addWidget(self.table_view)
         self.tabWidget_edit.addTab(self.tab_view, "")
         self.tab = QtWidgets.QWidget()
@@ -243,6 +258,215 @@ class Ui_MainWindow(object):
         self.retranslateUi(MainWindow)
         self.tabWidget_edit.setCurrentIndex(1)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
+    
+    def openFileNameDialog(self):
+        options = QFileDialog.Options()
+        #options |= QFileDialog.DontUseNativeDialog
+        fileName, _ = QFileDialog.getOpenFileName(MainWindow,"Openfile", "","sqlite file (*.sqlite3);;database file (*.db)", options=options)
+        if fileName:
+            self.file_name = fileName
+            print(self.file_name)
+            self.populate_table()
+        '''   
+         # Call method to populate table with data from database
+        try:
+            self.populate_table()
+        except:
+            # create a QMessageBox object
+            alert = QMessageBox()
+            
+            # set the message box text and tyspe of alert
+            alert.setText("database doesn't match!")
+            alert.setIcon(QMessageBox.Warning)
+            
+            # display the alert box  
+            alert.exec_()'''
+
+    def populate_table(self):
+        print("DATABASE is conneted")
+        global db_dir
+        db_dir = (self.file_name)
+        # Connect to database and execute SELECT statement
+        conn = sqlite3.connect(db_dir)
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM documents')
+        #try:
+            #cursor.execute('SELECT * FROM documents')
+        #except:
+            #print("It's is not my database")
+        documents = cursor.fetchall()
+        # Insert data into table
+        
+        self.table_view.setColumnCount(len(documents[0]))
+        self.table_view.setRowCount(len(documents))
+
+        for row in range(len(documents)):
+            for col in range(len(documents[0])):
+                item = QtWidgets.QTableWidgetItem(str(documents[row][col]))
+                self.table_view.setItem(row, col, item)
+
+        
+        print("Database is showing")
+        # Close database connection
+        conn.close()
+        
+    def search_input(self):
+        input_value = self.textEdit_2.toPlainText()
+        print(input_value)
+        Result_search = []
+        Result_search = self.sentence_search(input_value)
+        try:
+            self.table_view.setColumnCount(len(Result_search[0]))
+            self.table_view.setRowCount(len(Result_search))
+            for row in range(len(Result_search)):
+                for col in range(len(Result_search[0])):
+                    self.table_view.setItem(row, col, QtWidgets.QTableWidgetItem(str(Result_search[row][col])))
+        except:
+            error = "Not found"
+            self.table_view.setColumnCount(2)
+            self.table_view.setRowCount(2)
+            for row in range(2):
+                for col in range(2):
+                    self.table_view.setItem(row, col, QtWidgets.QTableWidgetItem(str(error)))
+            
+           
+            
+    def sentence_search(self,search_term):
+        conn = sqlite3.connect(db_dir)
+        cursor = conn.cursor()
+
+        # Split the query into individual words
+        search_term = [search_term]
+        clean_sentence = self.cleansing(search_term)
+        words = self.spacy_process(clean_sentence)
+
+        # Retrieve the documents that contain each word
+        doc_lists = []
+        for word in words:
+            cursor.execute("SELECT Doc_ID, TF_IDF FROM word_frequencies JOIN words ON words.ID = word_frequencies.word_ID WHERE word = ?", (word,))
+            doc_list = cursor.fetchall()
+            doc_lists.append(doc_list)
+
+        # Merge the document lists using the TF-IDF scores
+        doc_scores = {}
+        for doc_list in doc_lists:
+            for doc_id, tf_idf in doc_list:
+                if doc_id in doc_scores:
+                    doc_scores[doc_id] += tf_idf
+                else:
+                    doc_scores[doc_id] = tf_idf
+
+        # Rank the documents by their overall relevance
+        ranked_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
+
+        # Retrieve the links and titles of the top documents
+        results = []
+        for doc_id, score in ranked_docs:
+            cursor.execute("SELECT Link, Title FROM documents WHERE ID = ?", (doc_id,))
+            link, title = cursor.fetchone()
+            results.append((link, title))
+
+        conn.close()
+
+        return results
+    
+    def spacy_process(self,text):
+        nlp = spacy.load('en_core_web_sm')
+        doc = nlp(text)
+        
+    #Tokenization and lemmatization 
+        lemma_list = []
+        for token in doc:
+            lemma_list.append(token.lemma_)
+        #print("Tokenize+Lemmatize:")
+        #print(lemma_list)
+        
+        #Filter the stopword
+        filtered_sentence =[] 
+        for word in lemma_list:
+            lexeme = nlp.vocab[word]
+            if lexeme.is_stop == False:
+                filtered_sentence.append(word) 
+        
+        #Remove punctuation
+        punctuations="?:!.,;"
+        for word in filtered_sentence:
+            if word in punctuations:
+                filtered_sentence.remove(word)
+        #print(" ")
+        #3print("Remove stopword & punctuation: ")
+        #print(filtered_sentence)
+        return filtered_sentence
+
+    def cleansing(self,body):
+        for i in body:
+            output = i.replace('\n', '  ').replace('\xa0', '  ').replace('®', ' ').replace(';', ' ')
+            output = " ".join(output.split())
+        return output 
+
+    def get_word(self,body):
+        words = self.spacy_process(body)
+        word_freq = {}
+        for word in words:
+            if word in word_freq:
+                word_freq[word] += 1
+            else:
+                word_freq[word] = 1
+        return word_freq
+    
+    def scrape_tags(self,url):
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        try:
+            title_tag = soup.find('title').text
+        except:
+            title_tag = soup.find('title')
+        body_tag = soup.find('body')
+        text_below_body = body_tag.get_text() 
+        body_list =[]
+        body_list.append(text_below_body)
+        return (body_list,title_tag)
+    
+    def make_doc(self,link,target_links):
+        #print(link)
+        link.replace(" ", "")
+        d=dict()
+        #self.textBrowser.clear()
+        body, title = self.scrape_tags(link)
+        body=self.cleansing(body)
+        word = self.get_word(body)
+        #self.textBrowser.append(str(body))
+        #self.textBrowser.append(str(word))
+
+        d['link']= link
+        d['title'] = title
+        d['body']=body
+        d['location']='location'
+        d['word'] = word
+        
+        
+        for k in target_links:
+            if link.startswith(k):
+                d['ref'] = target_links[k]
+        #print(d)
+        return d
+
+    
+    def get_doc(self,target_links,n):
+        doc=[]
+        num=0
+        for i in target_links:
+            print(target_links,i,n)
+            web_spyder=spyder(target_links,i,n)
+            domain_links,target_links =web_spyder.get_all()
+            print('all link =', len(domain_links))
+            for j in domain_links:
+                num+=1
+                d = self.make_doc(j,target_links)
+                doc.append(d)
+                #self.lcdNumber.display(num)
+                print(num)
+        return doc 
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
@@ -269,7 +493,85 @@ class Ui_MainWindow(object):
         self.pushButton.setText(_translate("MainWindow", "Search"))
         self.tabWidget_edit.setTabText(self.tabWidget_edit.indexOf(self.tab_Search), _translate("MainWindow", "Search"))
 
+class spyder():
+    def __init__(self, links, base_url, depth, progress_signal):
+        self.progress_signal = progress_signal # store progress signal
+        self.base_url = base_url
+        target_links = {}
+        for i in links:
+            target_links[i] = 0
+        self.target_links = target_links
+        self.depth = depth
 
+    def crawl(self, url, n, depth, visited):
+        if depth < n:
+            visited.add(url)
+            headers = {'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246"}
+            time.sleep(0.3)
+            response = requests.get(url, headers=headers)
+            try:
+                soup = BeautifulSoup(response.text, 'html.parser')
+            except:
+                soup = BeautifulSoup(response.text, 'lxml')
+            links = soup.find_all('a')
+            links = [link.get('href') for link in links if link.get('href') and not link.get('href').startswith('#')]
+            links = [urljoin(url, link) for link in links if link]
+
+            for link in links:
+                if link not in visited:
+                    link = link.replace(' ', '')
+                    visited.add(link)
+                    if link.startswith(url):
+                        self.crawl(link, n=n, depth=depth+1, visited=visited)
+                    self.progress_signal.emit(link) # emit progress signal here
+        return visited
+
+    def get_crawler(self):
+        self.result_crawler = self.crawl(self.base_url, self.depth, 0, set())
+        return self.result_crawler
+
+    def get_check_domain(self):
+        self.check_domain_result = self.check_domain(self.base_url, self.get_crawler())
+        return self.check_domain_result
+
+    def get_check_not_domain(self):
+        self.check_not_domain_result = self.check_not_domain(self.base_url, self.get_crawler())
+        return self.check_not_domain_result
+
+    def get_check_ref(self):
+        self.check_ref_result = self.check_ref(self.get_check_not_domain(), self.target_links)
+        return self.check_ref_result
+
+    def get_all(self):
+        crawl = self.crawl(self.base_url, self.depth, 0, set())
+        check_domain = self.check_domain(self.base_url, crawl)
+        check_not_domain = self.check_not_domain(self.base_url, crawl)
+        check_ref = self.check_ref(check_not_domain, self.target_links)
+        return check_domain, check_ref
+
+    
+    def check_domain(self,base_url,links):
+        result= set()
+        for link in links :
+            if link.startswith(base_url):
+                result.add(link)
+        return result
+    
+    def check_not_domain(self,base_url,links):
+        result= set()
+        for link in links :
+            if not link.startswith(base_url):
+                result.add(link)
+        return result
+    
+    def check_ref(self,links,target_links):
+        for i in links:
+            for j in target_links:
+                if i.startswith(j):
+                    target_links[j]+=1
+        return target_links
+    
+    
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
