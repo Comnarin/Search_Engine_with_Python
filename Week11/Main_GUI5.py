@@ -395,6 +395,7 @@ class Ui_MainWindow(object):
         self.Button_EDIT.setEnabled(False)
         self.Button_REMOVE.setEnabled(False)
         self.textBrowser.append("Starting Scrap")
+        global target_links 
         target_links = []
         for i in range(self.listWidget.count()):
             item = self.listWidget.item(i)
@@ -403,22 +404,35 @@ class Ui_MainWindow(object):
         self.thread = SpiderThread(target_links, depth_value)
         self.thread.progress_signal.connect(self.progress_ui)
         self.thread.count_links_signal.connect(self.count_links_scraping)
+        self.thread.each_links_finished.connect(self.update_label)
+        
+        #self.thread.count_signal.connect(self.update_lcd)
         self.thread.finished.connect(self.update_ui)
         self.thread.finished.connect(lambda: self.pushButton_SAVE.setEnabled(True))
         self.thread.start()
 
-    def count_links_scraping(self,count_links):
-        self.lcdNumber.display(count_links)
+    def count_links_scraping(self,each_links_finished):
+        #self.lcdNumber.display(count_links) 
+        self.lcdNumber.display(each_links_finished)
+
+    def update_label(self, count):
+        self.label_Total.setText(target_links[count])
+        percent = 100*(count/len(target_links))
+        self.progressBar.setProperty("value", percent)
+
+
 
     def progress_ui(self,i):
         self.textBrowser.clear()
         self.textBrowser.append(i)
+        
 
     def update_ui(self, domain_links):
         self.textBrowser.clear()
         for i in domain_links:
             self.textBrowser.append(i)
-        
+        self.lcdNumber.display(len(domain_links))
+        self.label_Total.setText("Total")
         self.progressBar.setProperty("value", 100)
 
             
@@ -521,7 +535,7 @@ class Ui_MainWindow(object):
     def sentence_search(self,search_term):
         
         conn = sqlite3.connect(db_dir)
-        cursor = self.conn.cursor()
+        cursor = conn.cursor()
 
         # Split the query into individual words
         search_term = [search_term]
@@ -692,6 +706,8 @@ class SpiderThread(QThread):
     finished = pyqtSignal(list)
     progress_signal = pyqtSignal(str)
     count_links_signal = pyqtSignal(int)
+    #count_signal = pyqtSignal(int)
+    each_links_finished = pyqtSignal(int)
     def __init__(self, target_links, depth_value):
         super().__init__()
         self.target_links = target_links
@@ -699,15 +715,19 @@ class SpiderThread(QThread):
 
     def run(self):
         domain_links = []
+        links = 0
         for i in self.target_links:
+            self.each_links_finished.emit(links)
             web_spyder = spyder(self.target_links, i, self.depth_value, self.progress_signal,self.count_links_signal)  # <-- pass progress_signal to spyder
             domain_links.extend(web_spyder.get_crawler())
+            links+=1
         self.finished.emit(domain_links)
 
 class spyder():
     def __init__(self, links, base_url, depth, progress_signal, count_links_signal):
         self.progress_signal = progress_signal
         self.count_links_signal = count_links_signal
+        #self.each_links_finished = each_links_finished
         self.base_url = base_url
         target_links = {}
         for i in links:
@@ -716,9 +736,10 @@ class spyder():
         self.depth = depth
         self.total_links = 0
         self.crawled_links = 0
+        #self.counter = 0 # initialize counter variable
+        #self.lcd_Number = lcd_Number
 
     def crawl(self, url, n, depth, visited):
-        count_links = 0
         if depth < n:
             visited.add(url)
             headers = {'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246"}
@@ -740,11 +761,19 @@ class spyder():
                         self.crawl(link, n=n, depth=depth+1, visited=visited)
                     self.progress_signal.emit(link)
                     self.crawled_links += 1
+                    #self.counter += 1 # increment counter variable
                     self.count_links_signal.emit(self.crawled_links)
+                    #self.lcd_Number.display(self.counter) # update LCD number
         return visited
 
     def get_crawler(self):
+        
         self.result_crawler = self.crawl(self.base_url, self.depth, 0, set())
+        #self.counter += 1
+        #self.count_signal.emit(self.counter)
+        
+        
+        
         return self.result_crawler
 
     def get_check_domain(self):
