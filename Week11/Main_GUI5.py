@@ -343,7 +343,7 @@ class Ui_MainWindow(object):
         self.gridLayout_3.setRowStretch(2, 1)
         self.gridLayout_3.setRowStretch(3, 1)
         self.gridLayout_3.setRowStretch(4, 30)
-        self.tabWidget_edit.addTab(self.tab_Search, "")
+        #self.tabWidget_edit.addTab(self.tab_Search, "")
         self.gridLayout_4.addWidget(self.tabWidget_edit, 0, 0, 1, 1)
         MainWindow.setCentralWidget(self.centralwidget)
         self.statusbar = QtWidgets.QStatusBar(MainWindow)
@@ -423,7 +423,7 @@ class Ui_MainWindow(object):
 
 
     def progress_ui(self,i):
-        self.textBrowser.clear()
+        #self.textBrowser.clear()
         self.textBrowser.append(i)
         
 

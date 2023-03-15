@@ -25,7 +25,7 @@ public class LuceneReadIndexFromFileExample
         IndexSearcher searcher = createSearcher();
          
         //Search indexed contents using search term
-        TopDocs foundDocs = searchInContent("discove", searcher);
+        TopDocs foundDocs = searchInContent("broken", searcher);
          
         //Total found documents
         System.out.println("Total Results :: " + foundDocs.totalHits);
