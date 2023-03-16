@@ -394,13 +394,16 @@ class Ui_MainWindow(object):
         self.button_ADD.setEnabled(False)
         self.Button_EDIT.setEnabled(False)
         self.Button_REMOVE.setEnabled(False)
-        self.textBrowser.append("Starting Scrap")
+        self.textBrowser.append("Starting Scrap..........")
+        #self.progressBar.setProperty("value", 25)
         global target_links 
         target_links = []
         for i in range(self.listWidget.count()):
             item = self.listWidget.item(i)
             target_links.append(item.text())
         depth_value = self.spinBox_Depth.value()
+
+        
         self.thread = SpiderThread(target_links, depth_value)
         self.thread.progress_signal.connect(self.progress_ui)
         self.thread.count_links_signal.connect(self.count_links_scraping)
@@ -411,14 +414,17 @@ class Ui_MainWindow(object):
         self.thread.finished.connect(lambda: self.pushButton_SAVE.setEnabled(True))
         self.thread.start()
 
+
     def count_links_scraping(self,each_links_finished):
         #self.lcdNumber.display(count_links) 
-        self.lcdNumber.display(each_links_finished)
+        self.lcdNumber.display(each_links_finished[0])
+        self.label_Total.setText(each_links_finished[1])
 
     def update_label(self, count):
-        self.label_Total.setText(target_links[count])
-        percent = 100*(count/len(target_links))
+        #percent = 100*(count/len(target_links))-25
+        percent = (100*((count)/len(target_links)))
         self.progressBar.setProperty("value", percent)
+        
 
 
 
@@ -705,23 +711,47 @@ class Ui_MainWindow(object):
 class SpiderThread(QThread):
     finished = pyqtSignal(list)
     progress_signal = pyqtSignal(str)
-    count_links_signal = pyqtSignal(int)
-    #count_signal = pyqtSignal(int)
+    count_links_signal = pyqtSignal(list)
     each_links_finished = pyqtSignal(int)
+    #label_links_scraping = pyqtSignal(str)
     def __init__(self, target_links, depth_value):
         super().__init__()
         self.target_links = target_links
         self.depth_value = depth_value
-
+        self.threads = []  # List to hold the threads for each link
+        
     def run(self):
         domain_links = []
-        links = 0
         for i in self.target_links:
-            self.each_links_finished.emit(links)
-            web_spyder = spyder(self.target_links, i, self.depth_value, self.progress_signal,self.count_links_signal)  # <-- pass progress_signal to spyder
-            domain_links.extend(web_spyder.get_crawler())
-            links+=1
+            thread = LinkThread(i, self.depth_value, self.progress_signal, self.count_links_signal, self.each_links_finished)
+            self.threads.append(thread)
+            print(i)
+            thread.start()
+        
+        # Wait for all threads to finish before emitting the finished signal
+        for thread in self.threads:
+            thread.wait()
+            domain_links.extend(thread.result_crawler)
+            
         self.finished.emit(domain_links)
+        
+        
+class LinkThread(QThread):
+    def __init__(self, link, depth, progress_signal, count_links_signal, each_links_finished):
+        super().__init__()
+        self.link = link
+        self.depth = depth
+        self.progress_signal = progress_signal
+        self.count_links_signal = count_links_signal
+        self.each_links_finished = each_links_finished
+        self.result_crawler = []
+        
+    def run(self):
+        
+        web_spyder = spyder([self.link], self.link, self.depth, self.progress_signal, self.count_links_signal)  # <-- pass progress_signal to spyder
+        self.result_crawler = web_spyder.get_crawler()
+        self.each_links_finished.emit(1)
+        
 
 class spyder():
     def __init__(self, links, base_url, depth, progress_signal, count_links_signal):
@@ -762,7 +792,8 @@ class spyder():
                     self.progress_signal.emit(link)
                     self.crawled_links += 1
                     #self.counter += 1 # increment counter variable
-                    self.count_links_signal.emit(self.crawled_links)
+                    self.count_links_signal.emit([self.crawled_links,url])
+                    
                     #self.lcd_Number.display(self.counter) # update LCD number
         return visited
 
@@ -771,6 +802,7 @@ class spyder():
         self.result_crawler = self.crawl(self.base_url, self.depth, 0, set())
         #self.counter += 1
         #self.count_signal.emit(self.counter)
+        
         
         
         

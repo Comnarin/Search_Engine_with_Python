@@ -21,7 +21,7 @@
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout_4">
-    <item row="0" column="0">
+    <item row="0" column="1">
      <widget class="QTabWidget" name="tabWidget_edit">
       <property name="minimumSize">
        <size>
@@ -30,7 +30,7 @@
        </size>
       </property>
       <property name="currentIndex">
-       <number>0</number>
+       <number>3</number>
       </property>
       <widget class="QWidget" name="tab_scrapping">
        <property name="mouseTracking">
@@ -45,23 +45,120 @@
        <attribute name="title">
         <string>scrap</string>
        </attribute>
-       <layout class="QGridLayout" name="gridLayout_2" rowstretch="0,0,10,0,0,0,0,0">
-        <item row="1" column="0">
-         <layout class="QHBoxLayout" name="horizontalLayout_2">
+       <layout class="QGridLayout" name="gridLayout_2">
+        <item row="0" column="0">
+         <layout class="QVBoxLayout" name="verticalLayout_2">
           <item>
-           <widget class="QLabel" name="label_Total">
+           <widget class="QPushButton" name="save_path">
+            <property name="font">
+             <font>
+              <pointsize>18</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>Save as</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_Input_domain">
+            <property name="font">
+             <font>
+              <pointsize>20</pointsize>
+              <underline>true</underline>
+             </font>
+            </property>
+            <property name="layoutDirection">
+             <enum>Qt::LeftToRight</enum>
+            </property>
+            <property name="text">
+             <string>INPUT Domain links</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QListWidget" name="listWidget">
+            <property name="font">
+             <font>
+              <pointsize>18</pointsize>
+             </font>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item row="0" column="1">
+         <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,0,0">
+          <property name="spacing">
+           <number>30</number>
+          </property>
+          <property name="topMargin">
+           <number>50</number>
+          </property>
+          <item>
+           <spacer name="verticalSpacer">
+            <property name="orientation">
+             <enum>Qt::Vertical</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>20</width>
+              <height>40</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QPushButton" name="Button_ADD">
+            <property name="font">
+             <font>
+              <pointsize>15</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>ADD</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="Button_EDIT">
+            <property name="font">
+             <font>
+              <pointsize>15</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>EDIT</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="Button_REMOVE">
+            <property name="font">
+             <font>
+              <pointsize>15</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>REMOVE</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item row="1" column="0">
+         <layout class="QHBoxLayout" name="horizontalLayout">
+          <item>
+           <widget class="QLabel" name="label_Queue">
             <property name="font">
              <font>
               <pointsize>20</pointsize>
              </font>
             </property>
             <property name="text">
-             <string>TOTAL</string>
+             <string>Queue</string>
             </property>
            </widget>
-          </item>
-          <item>
-           <widget class="QLCDNumber" name="lcdNumber"/>
           </item>
           <item>
            <widget class="QLabel" name="label_Depth">
@@ -110,12 +207,64 @@
          </layout>
         </item>
         <item row="2" column="0">
+         <widget class="QTableWidget" name="table_queue">
+          <property name="font">
+           <font>
+            <pointsize>15</pointsize>
+           </font>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="1">
+         <widget class="QPushButton" name="Button_OpenQueue">
+          <property name="font">
+           <font>
+            <pointsize>18</pointsize>
+           </font>
+          </property>
+          <property name="text">
+           <string>Open 
+ Database</string>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="0">
+         <layout class="QHBoxLayout" name="horizontalLayout_2">
+          <item>
+           <widget class="QLabel" name="label_Total">
+            <property name="font">
+             <font>
+              <pointsize>20</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>TOTAL</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLCDNumber" name="lcdNumber"/>
+          </item>
+         </layout>
+        </item>
+        <item row="4" column="0">
          <layout class="QVBoxLayout" name="verticalLayout_4">
           <item>
-           <widget class="QTextBrowser" name="textBrowser"/>
+           <widget class="QTextBrowser" name="textBrowser">
+            <property name="font">
+             <font>
+              <pointsize>18</pointsize>
+             </font>
+            </property>
+           </widget>
           </item>
           <item>
            <widget class="QProgressBar" name="progressBar">
+            <property name="font">
+             <font>
+              <pointsize>13</pointsize>
+             </font>
+            </property>
             <property name="locale">
              <locale language="English" country="UnitedStates"/>
             </property>
@@ -129,122 +278,17 @@
           </item>
          </layout>
         </item>
-        <item row="0" column="1">
-         <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,0">
-          <property name="spacing">
-           <number>30</number>
-          </property>
-          <property name="topMargin">
-           <number>50</number>
-          </property>
-          <item>
-           <widget class="QPushButton" name="button_ADD">
-            <property name="font">
-             <font>
-              <pointsize>15</pointsize>
-             </font>
-            </property>
-            <property name="text">
-             <string>ADD</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="Button_EDIT">
-            <property name="font">
-             <font>
-              <pointsize>15</pointsize>
-             </font>
-            </property>
-            <property name="text">
-             <string>EDIT</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="Button_REMOVE">
-            <property name="font">
-             <font>
-              <pointsize>15</pointsize>
-             </font>
-            </property>
-            <property name="text">
-             <string>REMOVE</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-        <item row="0" column="0">
-         <layout class="QVBoxLayout" name="verticalLayout_2">
-          <item>
-           <widget class="QPushButton" name="save_path">
-            <property name="font">
-             <font>
-              <pointsize>18</pointsize>
-             </font>
-            </property>
-            <property name="text">
-             <string>Save as</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLabel" name="label_Input_domain">
-            <property name="font">
-             <font>
-              <pointsize>20</pointsize>
-              <underline>true</underline>
-             </font>
-            </property>
-            <property name="layoutDirection">
-             <enum>Qt::LeftToRight</enum>
-            </property>
-            <property name="text">
-             <string>INPUT Domain links</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QListWidget" name="listWidget"/>
-          </item>
-         </layout>
-        </item>
-        <item row="6" column="1">
-         <widget class="QPushButton" name="pushButton_6">
-          <property name="font">
-           <font>
-            <pointsize>18</pointsize>
-           </font>
-          </property>
-          <property name="text">
-           <string>Save</string>
-          </property>
-         </widget>
-        </item>
-        <item row="6" column="0">
-         <widget class="QLabel" name="path_file">
-          <property name="font">
-           <font>
-            <pointsize>14</pointsize>
-           </font>
-          </property>
-          <property name="text">
-           <string>Save as :</string>
-          </property>
-         </widget>
-        </item>
-        <item row="2" column="1">
+        <item row="4" column="1">
          <layout class="QVBoxLayout" name="verticalLayout_5">
           <item>
-           <widget class="QPushButton" name="Button_Start">
+           <widget class="QPushButton" name="Button_CRAWLER">
             <property name="font">
              <font>
               <pointsize>18</pointsize>
              </font>
             </property>
             <property name="text">
-             <string>Start </string>
+             <string>Crawler</string>
             </property>
             <property name="iconSize">
              <size>
@@ -264,7 +308,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QPushButton" name="pushButton_5">
+           <widget class="QPushButton" name="Button_PAUSE">
             <property name="font">
              <font>
               <pointsize>18</pointsize>
@@ -275,15 +319,51 @@
             </property>
            </widget>
           </item>
+          <item>
+           <widget class="QPushButton" name="Button_RESUME">
+            <property name="font">
+             <font>
+              <pointsize>18</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>RESUME</string>
+            </property>
+           </widget>
+          </item>
          </layout>
+        </item>
+        <item row="5" column="0">
+         <widget class="QLabel" name="path_file">
+          <property name="font">
+           <font>
+            <pointsize>14</pointsize>
+           </font>
+          </property>
+          <property name="text">
+           <string>Save as :</string>
+          </property>
+         </widget>
+        </item>
+        <item row="5" column="1">
+         <widget class="QPushButton" name="Button_Index">
+          <property name="font">
+           <font>
+            <pointsize>18</pointsize>
+           </font>
+          </property>
+          <property name="text">
+           <string>Index</string>
+          </property>
+         </widget>
         </item>
        </layout>
       </widget>
-      <widget class="QWidget" name="tab_view">
+      <widget class="QWidget" name="tab_Search">
        <attribute name="title">
-        <string>view</string>
+        <string>Search</string>
        </attribute>
-       <layout class="QVBoxLayout" name="verticalLayout_3" stretch="0,1,0,20">
+       <layout class="QVBoxLayout" name="verticalLayout_3" stretch="0,1,0,10">
         <item>
          <widget class="QPushButton" name="Button_view_path">
           <property name="font">
@@ -314,7 +394,7 @@
           <widget class="QPushButton" name="Search_button">
            <property name="font">
             <font>
-             <pointsize>10</pointsize>
+             <pointsize>40</pointsize>
             </font>
            </property>
            <property name="text">
@@ -350,17 +430,23 @@
        <attribute name="title">
         <string>Edit</string>
        </attribute>
-       <layout class="QGridLayout" name="gridLayout" rowstretch="1,1,1,1,1,1,20">
+       <layout class="QGridLayout" name="gridLayout" rowstretch="1,1,1,1,1,0,30" columnstretch="0,0,10,0,0" rowminimumheight="0,0,0,0,0,0,0">
+        <property name="horizontalSpacing">
+         <number>1</number>
+        </property>
+        <property name="verticalSpacing">
+         <number>-1</number>
+        </property>
         <item row="1" column="2">
          <widget class="QTextEdit" name="textEdit_Update">
           <property name="font">
            <font>
-            <pointsize>12</pointsize>
+            <pointsize>22</pointsize>
            </font>
           </property>
          </widget>
         </item>
-        <item row="1" column="3">
+        <item row="1" column="4">
          <widget class="QPushButton" name="Button_update">
           <property name="font">
            <font>
@@ -389,12 +475,12 @@
          <widget class="QTextEdit" name="textEdit_Remove">
           <property name="font">
            <font>
-            <pointsize>12</pointsize>
+            <pointsize>22</pointsize>
            </font>
           </property>
          </widget>
         </item>
-        <item row="4" column="3">
+        <item row="4" column="4">
          <widget class="QPushButton" name="Button_Remove">
           <property name="font">
            <font>
@@ -407,7 +493,13 @@
          </widget>
         </item>
         <item row="6" column="0" colspan="3">
-         <widget class="QTextBrowser" name="textBrowser_Console_Edit"/>
+         <widget class="QTextBrowser" name="textBrowser_Console_Edit">
+          <property name="font">
+           <font>
+            <pointsize>18</pointsize>
+           </font>
+          </property>
+         </widget>
         </item>
         <item row="5" column="1" colspan="2">
          <widget class="QProgressBar" name="progressBar_Remove">
@@ -430,7 +522,7 @@
            </font>
           </property>
           <property name="text">
-           <string>REMOVE</string>
+           <string>REMOVE :</string>
           </property>
          </widget>
         </item>
@@ -442,9 +534,22 @@
            </font>
           </property>
           <property name="text">
-           <string>UPDATE</string>
+           <string>UPDATE :</string>
           </property>
          </widget>
+        </item>
+        <item row="1" column="3">
+         <spacer name="horizontalSpacer">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
         </item>
        </layout>
       </widget>
@@ -457,7 +562,7 @@
          <widget class="QLabel" name="label_Spatial">
           <property name="font">
            <font>
-            <pointsize>18</pointsize>
+            <pointsize>20</pointsize>
            </font>
           </property>
           <property name="text">
@@ -472,7 +577,7 @@
          <widget class="QLabel" name="label_Topkeywords">
           <property name="font">
            <font>
-            <pointsize>18</pointsize>
+            <pointsize>20</pointsize>
            </font>
           </property>
           <property name="text">
@@ -482,56 +587,6 @@
         </item>
         <item row="3" column="0">
          <widget class="QGraphicsView" name="graphicsView_Keyword"/>
-        </item>
-       </layout>
-      </widget>
-      <widget class="QWidget" name="tab_Search">
-       <attribute name="title">
-        <string>Search</string>
-       </attribute>
-       <layout class="QGridLayout" name="gridLayout_3" rowstretch="1,1,1,1,30">
-        <item row="0" column="1">
-         <widget class="QLabel" name="label_search">
-          <property name="font">
-           <font>
-            <pointsize>20</pointsize>
-           </font>
-          </property>
-          <property name="text">
-           <string>Search</string>
-          </property>
-         </widget>
-        </item>
-        <item row="3" column="1">
-         <widget class="QPushButton" name="Button_Search">
-          <property name="font">
-           <font>
-            <pointsize>20</pointsize>
-           </font>
-          </property>
-          <property name="text">
-           <string>Search</string>
-          </property>
-         </widget>
-        </item>
-        <item row="4" column="0" colspan="3">
-         <widget class="QTextBrowser" name="textBrowser_console_Search"/>
-        </item>
-        <item row="1" column="1" rowspan="2">
-         <widget class="QTextEdit" name="textEdit_Search">
-          <property name="minimumSize">
-           <size>
-            <width>0</width>
-            <height>0</height>
-           </size>
-          </property>
-          <property name="baseSize">
-           <size>
-            <width>0</width>
-            <height>0</height>
-           </size>
-          </property>
-         </widget>
         </item>
        </layout>
       </widget>
