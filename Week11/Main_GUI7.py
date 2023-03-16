@@ -121,14 +121,14 @@ class Ui_MainWindow(object):
         self.Button_Index.setFont(font)
         self.Button_Index.setObjectName("Button_Index")
         self.gridLayout_2.addWidget(self.Button_Index, 6, 1, 1, 1)
-        self.table_queue = QtWidgets.QTableWidget(self.tab_scrapping)
+
+        self.list_queue = QtWidgets.QListWidget(self.tab_scrapping)
         font = QtGui.QFont()
         font.setPointSize(15)
-        self.table_queue.setFont(font)
-        self.table_queue.setObjectName("table_queue")
-        self.table_queue.setColumnCount(0)
-        self.table_queue.setRowCount(0)
-        self.gridLayout_2.addWidget(self.table_queue, 3, 0, 1, 1)
+        self.list_queue.setFont(font)
+        self.list_queue.setObjectName("listWidget_Queue")
+        
+        self.gridLayout_2.addWidget(self.list_queue, 3, 0, 1, 1)
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_2.setObjectName("horizontalLayout_2")
         self.label_Total = QtWidgets.QLabel(self.tab_scrapping)
@@ -345,6 +345,8 @@ class Ui_MainWindow(object):
         self.Button_REMOVE.clicked.connect(self.removelink)
         self.Button_CRAWLER.clicked.connect(self.clicked_start)
         self.save_path.clicked.connect(self.openFileSave)
+        self.Button_Index.clicked.connect(self.clicked_Index)
+        self.folderpath = None
 
         self.Button_view_path.clicked.connect(self.openFileNameDialog)
         self.Search_button.clicked.connect(self.search_input)
@@ -384,6 +386,7 @@ class Ui_MainWindow(object):
             del item
 
     def clicked_start(self):
+        
         self.textBrowser.clear()
         self.Button_CRAWLER.setEnabled(False)
         self.Button_ADD.setEnabled(False)
@@ -393,6 +396,7 @@ class Ui_MainWindow(object):
         self.Button_OpenQueue.setEnabled(False)
         self.Button_PAUSE.setEnabled(False)
         self.Button_Index.setEnabled(False)
+         
         self.textBrowser.append("Starting Scrap ..........")
         self.progressBar.setProperty("value", 10)
         global target_links 
@@ -436,7 +440,8 @@ class Ui_MainWindow(object):
 
     def update_ui(self, domain_links):
         self.textBrowser.clear()
-        for i in domain_links:
+        self.scrap_links = domain_links
+        for i in self.scrap_links:
             self.textBrowser.append(i)
         self.lcdNumber.display(len(domain_links))
         self.label_Total.setText("Total")
@@ -445,13 +450,84 @@ class Ui_MainWindow(object):
 
             
     def openFileSave(self):
-        options = QFileDialog.Options()
-        #options |= QFileDialog.DontUseNativeDialog
-        folderpath = QtWidgets.QFileDialog.getExistingDirectory(MainWindow, 'Select Folder')
-        if folderpath:
-            self.folderpath = folderpath
-            print(self.folderpath)
-        self.path_file.setText("Save as : "+ self.folderpath)
+        while True:
+                self.path_file.setText("No directory selected")
+                self.folderpath = QtWidgets.QFileDialog.getExistingDirectory(MainWindow, 'Select Folder')
+                if self.folderpath:
+                    break
+        self.path_file.setText("Save as: " + self.folderpath)
+        global db_dir
+        db_dir = (self.folderpath+'/inverted_index.db')
+        conn = sqlite3.connect(db_dir)
+
+        conn.execute('''
+        CREATE TABLE Temp_Link (
+            ID INTEGER PRIMARY KEY,
+            Link TEXT NOT NULL UNIQUE
+        );
+        ''')
+
+        conn.commit()
+        self.save_path.setEnabled(False)
+
+    def clicked_Index(self):
+        self.textBrowser.clear()
+        if not self.folderpath:
+            QMessageBox.information(MainWindow, 'No Directory Selected', 'Please select a directory')
+            self.folderpath = QtWidgets.QFileDialog.getExistingDirectory(MainWindow, 'Select Folder')
+            if self.folderpath:
+                self.path_file.setText("Save as: " + self.folderpath)
+                global db_dir
+                db_dir = (self.folderpath+'/inverted_index.db')
+                conn = sqlite3.connect(db_dir)
+
+                conn.execute('''
+                CREATE TABLE Temp_Link (
+                    ID INTEGER PRIMARY KEY,
+                    Link TEXT NOT NULL UNIQUE
+                );
+                ''')
+
+                conn.commit()
+            else:
+                while True:
+                    self.path_file.setText("No directory selected")
+                    self.folderpath = QtWidgets.QFileDialog.getExistingDirectory(MainWindow, 'Select Folder')
+                    if self.folderpath:
+                        break
+        self.save_path.setEnabled(False)
+        self.textBrowser.append("Adding Database")
+        self.addlinks_into_database()
+        self.textBrowser.append("Indexing")
+
+
+    def addlinks_into_database(self):
+        conn = sqlite3.connect(db_dir)
+        for i in self.scrap_links:
+            conn.execute('''INSERT INTO Temp_link (Link) VALUES (?);''', (i,))
+            conn.commit()
+        self.show_queue()
+
+    def show_queue(self):
+        self.textBrowser.clear()
+        conn = sqlite3.connect(db_dir)
+        cursor = conn.cursor()
+        cursor.execute('SELECT Link FROM Temp_link')
+        #try:
+            #cursor.execute('SELECT * FROM documents')
+        #except:
+            #print("It's is not my database")
+        Temp_link = cursor.fetchall()
+        Temp_link = [t[0] for t in Temp_link]
+        # Insert data into table
+        
+
+        for i in Temp_link:
+            self.list_queue.addItem(i)
+
+        self.textBrowser.append("Database is showing")
+        # Close database connection
+        conn.close()
     
     def update_button_click(self):
         input_update = self.textEdit_Update.toPlainText()
@@ -490,9 +566,9 @@ class Ui_MainWindow(object):
             alert.exec_()'''
 
     def populate_table(self):
-        print("DATABASE is conneted")
-        global db_dir
-        db_dir = self.file_name
+        #print("DATABASE is conneted")
+        #global db_dir
+        #db_dir = self.file_name
         # Connect to database and execute SELECT statement
         conn = sqlite3.connect(db_dir)
         cursor = conn.cursor()
@@ -804,10 +880,6 @@ class spyder():
         self.result_crawler = self.crawl(self.base_url, self.depth, 0, set())
         #self.counter += 1
         #self.count_signal.emit(self.counter)
-        
-        
-        
-        
         return self.result_crawler
 
     def get_check_domain(self):
