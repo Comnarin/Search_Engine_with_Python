@@ -552,6 +552,7 @@ class Ui_MainWindow(object):
 
     def clicked_Index(self):
         self.textBrowser.clear()
+        self.progressBar.setProperty("value", 0)
         if not self.folderpath:
             QMessageBox.information(MainWindow, 'No Directory Selected', 'Please select a directory')
             self.folderpath = QtWidgets.QFileDialog.getExistingDirectory(MainWindow, 'Select Folder')
@@ -628,7 +629,9 @@ class Ui_MainWindow(object):
             self.textBrowser.append("Link : "+doc[0])
             self.textBrowser.append("Title : "+doc[1])
             self.textBrowser.append("Location : "+str(doc[2]))
-            self.show_queue()
+            len_Temp = self.show_queue_indexing()
+            percent = 100*((len(self.scrap_links) - len_Temp)/len(self.scrap_links))
+            self.progressBar.setProperty("value", percent)
         except:
             self.textBrowser.clear()
             self.value_scrap_link+=1
@@ -636,10 +639,34 @@ class Ui_MainWindow(object):
         
     def handle_indexing_finished(self):
         # Handle the indexing finished signal
+        self.list_queue.clear()
+        self.progressBar.setProperty("value", 100)
         self.textBrowser.clear()
         self.update_tf_idf()
         print("Finished")
         self.textBrowser.append("Finished")
+
+    def show_queue_indexing(self):
+        self.list_queue.clear()
+        conn = sqlite3.connect(db_dir)
+        cursor = conn.cursor()
+        cursor.execute('SELECT Link FROM Temp_link')
+        #try:
+            #cursor.execute('SELECT * FROM documents')
+        #except:
+            #print("It's is not my database")
+        Temp_link = cursor.fetchall()
+        Temp_link = [t[0] for t in Temp_link]
+        # Insert data into table
+        
+
+        for i in Temp_link:
+            self.list_queue.addItem(i)
+
+        
+        # Close database connection
+        conn.close()
+        return len(Temp_link)
 
 
     def show_queue(self):
