@@ -371,6 +371,9 @@ class Ui_MainWindow(object):
         self.Button_update.setEnabled(False)
         self.Button_Remove.setEnabled(False)
 
+        self.Button_update.clicked.connect(self.update_button_click)
+        self.Button_Remove.clicked.connect(self.remove_button_click)
+
     def load_input_domain(self):
         domainlinks = ['http://www.bbc.com','http://www.thairath.co.th']
         for i in domainlinks:
@@ -533,6 +536,8 @@ class Ui_MainWindow(object):
             Total_link = [t[0] for t in Total_link]
             self.lcdNumber.display(len(Total_link))
             self.Search_button.setEnabled(True)
+            self.Button_Remove.setEnabled(True)
+            self.Button_update.setEnabled(True)
             self.Button_view_path.setEnabled(True)
             self.populate_table()
         else:
@@ -800,10 +805,42 @@ class Ui_MainWindow(object):
      
     def update_button_click(self):
         input_update = self.textEdit_Update.toPlainText()
-        print(input_update)
         self.textBrowser_Console_Edit.clear()
-        self.textBrowser_Console_Edit.append(input_update)
+        self.textBrowser_Console_Edit.append("Updating...")
+
+        # Create the UpdateThread and connect signals
+        self.update_thread = UpdateThread(input_update)
+        self.update_thread.finished.connect(self.update_finished)
+        self.update_thread.console_updated.connect(self.update_console)
+
+        # Start the thread
+        self.update_thread.start()
+
+    def update_finished(self):
+        self.textBrowser_Console_Edit.append("Update complete.")
+
+    def update_console(self, message):
+        self.textBrowser_Console_Edit.append(message)
     
+
+    def delete_data(self,link):
+        conn = sqlite3.connect(db_dir,timeout=10)
+        doc_id = conn.execute('''
+        SELECT id FROM documents WHERE link = ?; ''', (link,)).fetchone()[0]
+        conn.execute('''
+            DELETE FROM documents WHERE link = ?; ''', (link,))
+
+        conn.execute('''
+            DELETE FROM word_frequencies WHERE Doc_ID = ?;''', (doc_id,))
+
+        conn.execute('''
+            DELETE FROM words
+            WHERE NOT EXISTS (SELECT 1 FROM word_frequencies WHERE word_frequencies.word_id = words.id );''')
+        
+        conn.commit()
+        self.update_tf_idf()
+
+
     def remove_button_click(self):
         input_remove = self.textEdit_Remove.toPlainText()
         print(input_remove)
@@ -924,7 +961,9 @@ class Ui_MainWindow(object):
         conn.close()
 
         return results
-        
+    
+    
+
     
     def spacy_process(self,text):
         
@@ -1062,6 +1101,27 @@ class Ui_MainWindow(object):
                 if j.startswith(k):
                     conn.execute('UPDATE documents SET REF = ? WHERE link = ? ', (ref[k], j,))
         conn.commit()
+
+    def insert_to_database(self,doc):
+        conn = sqlite3.connect(db_dir)
+        for i in doc:
+            conn.execute('''INSERT INTO documents (Link, Title, Body, Location, Ref, Time) VALUES (?, ?, ?, ?, ?, ?);''', (str(i['link']), str(i['title']), str(i['body']), str(i['location']), int(i['ref']), datetime.now()))
+            doc_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            
+            for j in i['word'].keys():
+                word_id = conn.execute("SELECT id FROM words WHERE word = ?", (j,)).fetchone()
+                if not word_id:
+                    conn.execute("INSERT INTO words (word) VALUES (?)", (j,))
+                    word_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+                else:
+                    word_id = word_id[0]
+                
+                conn.execute('''INSERT INTO word_frequencies (word_id, doc_id, Frequency) VALUES (?, ?, ?);''', (word_id, doc_id, i['word'][j]))
+        
+        
+            
+        conn.commit()
+        self.update_tf_idf()
 
     def eng_location(self,data,title):
         try:
@@ -1531,6 +1591,13 @@ class spyder:
                     target_links[j]+=1
         return target_links
     
+    def get_all(self):
+        crawl = self.crawl(self.base_url,self.depth,0,set())
+        check_domain =  self.check_domain(self.base_url,crawl) 
+        check_not_domain = self.check_not_domain(self.base_url,crawl)
+        check_ref = self.check_ref(check_not_domain,self.target_links)
+        return check_domain,check_ref
+    
 class Thai:
     def __init__(self,data:list):
         self.data_value = data
@@ -1561,6 +1628,253 @@ class Thai:
         self.location_value = tag_provinces(self.data)
         self.Result_location = [entry for entry in self.location_value if entry[1] == 'B-LOCATION']
         return self.Result_location
+    
+class UpdateThread(QThread):
+    finished = pyqtSignal()
+    console_updated = pyqtSignal(str)
+    
+    def __init__(self, input_update):
+        super().__init__()
+        self.input_update = input_update
+        
+    def run(self):
+        conn = sqlite3.connect(db_dir, timeout=10)
+        target_links = {}
+        for i in self.input_update:
+            target_links[self.input_update] = 0
+        for i in target_links:
+            get_link = spyder(target_links, i, 2)
+            domain_link, target_links = get_link.get_all()
+        for j in domain_link:
+            link = conn.execute('''SELECT  documents.link
+                                   FROM documents
+                                   WHERE documents.link = ?
+                                   ''', (j,))
+            link = link.fetchone()
+            doc = [self.make_doc(j, target_links)]
+            if link is None:
+                self.console_updated.emit(j)
+                self.insert_to_database(doc)
+            else:
+                self.delete_data(j)
+                self.insert_to_database(doc)
+        conn.close()
+        self.finished.emit()
+
+    def make_doc(self,link,target_links):
+        link.replace(" ", "")
+        d=dict()
+        body,word,title,location=self.check_lang(link)
+        d['link']= link
+        d['title'] = title
+        d['body']=body
+        d['location']=location
+        d['word'] = word
+        for k in target_links:
+            if link.startswith(k):
+                d['ref'] = target_links[k]
+        
+        return d
+    
+    def insert_to_database(self,doc):
+        conn = sqlite3.connect(db_dir)
+        for i in doc:
+            conn.execute('''INSERT INTO documents (Link, Title, Body, Location, Ref, Time) VALUES (?, ?, ?, ?, ?, ?);''', (str(i['link']), str(i['title']), str(i['body']), str(i['location']), int(i['ref']), datetime.now()))
+            doc_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            
+            for j in i['word'].keys():
+                word_id = conn.execute("SELECT id FROM words WHERE word = ?", (j,)).fetchone()
+                if not word_id:
+                    conn.execute("INSERT INTO words (word) VALUES (?)", (j,))
+                    word_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+                else:
+                    word_id = word_id[0]
+                
+                conn.execute('''INSERT INTO word_frequencies (word_id, doc_id, Frequency) VALUES (?, ?, ?);''', (word_id, doc_id, i['word'][j]))
+            
+        conn.commit()
+
+
+    def get_ref(self):
+        conn = sqlite3.connect(db_dir)
+        domain = conn.execute("SELECT domain_link FROM domain_link ;").fetchall()
+        domain = [t[0] for t in domain]
+        for i in domain :
+            web = spyder(domain,i,1)
+            ref = web.get_check_ref()
+        return ref
+    
+    def make_doc(self,link,ref):
+        newlink=link.replace(" ", "")
+        d=dict()    
+        body,word,title,location = self.check_lang(newlink)
+        if body == None:
+            body = 'None'
+        d['link']= link
+        d['title'] = title
+        d['body']=body
+        d['location']=location
+        d['word'] = word
+        for i in ref:
+            
+            if link.startswith(i):
+                d['ref'] = ref[i]
+                
+            else:
+                d['ref'] = 0
+        return d
+    
+    def check_lang(self,url:str):
+        data_lang,title = self.scrap_tags(url)
+        try:
+            percent = pythainlp.util.countthai(data_lang[0][0])
+            if percent >50:
+                thai_nlp = self.Thai(data_lang[0]) 
+                word = thai_nlp.word
+                try:
+                    location = 'จ.'+max(thai_nlp.get_location().keys())
+                except:
+                    location = 'Thailand'
+                new_list = [s.strip().replace('"', '') for s in word if s.strip()]
+                while '' in new_list:
+                    new_list.remove('')
+                word = self.get_word(new_list)
+                return data_lang,word,title,location
+            else:
+                clean_body=self.cleansing(data_lang)
+                body = self.cleansing(data_lang)
+                word = self.get_word(body)
+                location = self.eng_location(data_lang,title)
+                return clean_body,word,title,location
+        except:
+            clean_body=self.cleansing(data_lang)
+            body = self.cleansing(data_lang)
+            word = self.get_word(body)
+            location = self.eng_location(data_lang,title)
+            return clean_body,word,title,location
+        
+    def scrap_tags(self,url):
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        try:
+            title_tag = soup.find('title').text
+        except:
+            title_tag = soup.find('title')
+        try:
+            body_tag = soup.find('body')
+            text_below_body = body_tag.get_text() 
+        except:
+            text_below_body ='Not Found'
+        body_list =[]
+        body_list.append(text_below_body)
+        return (body_list,title_tag)
+
+    def cleansing(self,body):
+        for i in body:
+            output = i.replace('\n', '  ').replace('\xa0', '  ').replace('®', ' ').replace(';', ' ')
+            output = " ".join(output.split())
+        return output 
+
+    def get_word(self,body):
+        words = self.spacy_process(body)
+        word_freq = {}
+        for word in words:
+            if word in word_freq:
+                word_freq[word] += 1
+            else:
+                word_freq[word] = 1
+        return word_freq
+    
+    def spacy_process(self,text):
+        
+        nlp = spacy.load('en_core_web_sm')
+        doc = nlp(text)
+        
+    #Tokenization and lemmatization 
+        lemma_list = []
+        for token in doc:
+            lemma_list.append(token.lemma_)
+        #print("Tokenize+Lemmatize:")
+        #print(lemma_list)
+        
+        #Filter the stopword
+        filtered_sentence =[] 
+        for word in lemma_list:
+            lexeme = nlp.vocab[word]
+            if lexeme.is_stop == False:
+                filtered_sentence.append(word) 
+        
+        #Remove punctuation
+        punctuations="?:!.,;"
+        for word in filtered_sentence:
+            if word in punctuations:
+                filtered_sentence.remove(word)
+        #print(" ")
+        #3print("Remove stopword & punctuation: ")
+        #print(filtered_sentence)
+        return filtered_sentence
+    
+    def eng_location(self,data,title):
+        try:
+            entities = locationtagger.find_locations(text = data[0])
+            location = entities.countries
+            if location == []:
+                entities = locationtagger.find_locations(text = title)
+                location = entities.countries
+                if location ==[]:
+                    location = ['None']
+        except:
+            location = ['None']
+        return location 
+
+    def delete_data(self,link):
+        conn = sqlite3.connect(db_dir,timeout=10)
+        doc_id = conn.execute('''
+        SELECT id FROM documents WHERE link = ?; ''', (link,)).fetchone()[0]
+        conn.execute('''
+            DELETE FROM documents WHERE link = ?; ''', (link,))
+
+        conn.execute('''
+            DELETE FROM word_frequencies WHERE Doc_ID = ?;''', (doc_id,))
+
+        conn.execute('''
+            DELETE FROM words
+            WHERE NOT EXISTS (SELECT 1 FROM word_frequencies WHERE word_frequencies.word_id = words.id );''')
+        
+        conn.commit()
+        self.update_tf_idf()
+
+    def update_tf_idf(self):
+        conn = sqlite3.connect(db_dir,timeout=3)
+
+        cursor = conn.execute('SELECT COUNT(*) FROM documents')
+        N = cursor.fetchone()[0]
+        
+        cursor = conn.execute('SELECT ID, Word FROM words')
+        words = cursor.fetchall()
+        
+        for word in words:
+            word_id = word[0]
+            word_str = word[1]
+
+            cursor = conn.execute('SELECT Doc_ID, Frequency FROM word_frequencies WHERE Word_ID = ?', (word_id,))
+            doc_freqs = cursor.fetchall()
+
+            df = len(doc_freqs)
+            idf = math.log(N / df)
+
+            for doc_freq in doc_freqs:
+                doc_id = doc_freq[0]
+                tf = doc_freq[1]
+                tf_idf = tf * idf
+                conn.execute('UPDATE word_frequencies SET TF_IDF = ? WHERE Word_ID = ? AND Doc_ID = ?', (tf_idf, word_id, doc_id))
+
+        conn.commit()
+
+    
+        
+
+
     
 if __name__ == "__main__":
     import sys
