@@ -368,6 +368,9 @@ class Ui_MainWindow(object):
         self.Button_view_path.clicked.connect(self.openFileNameDialog)
         self.Search_button.clicked.connect(self.search_input)
 
+        self.Button_update.setEnabled(False)
+        self.Button_Remove.setEnabled(False)
+
     def load_input_domain(self):
         domainlinks = ['http://www.bbc.com','http://www.thairath.co.th']
         for i in domainlinks:
@@ -511,13 +514,52 @@ class Ui_MainWindow(object):
         self.path_file.setText("Save as: " + self.selected_file)
         global db_dir
         db_dir = (self.selected_file)
+        self.textBrowser.clear()
+        self.save_path.setEnabled(False)
+        self.Button_OpenQueue.setEnabled(False)
+        self.spinBox_Depth.setDisabled(True)
+        self.progressBar.setProperty("value", 0)
+        self.queue_to_InputDomain()
         self.show_queue()
         self.lcdNumber.display(0)
         self.value_scrap_link = 0
         self.len_queue_scap = self.show_queue_indexing()
-        self.Button_Index.setEnabled(True)
-        self.Button_Index.clicked.connect(self.run_queue)
+        if self.len_queue_scap == 0:
+            self.textBrowser.append("Database is ready to Search")
+            conn = sqlite3.connect(db_dir)
+            cursor = conn.cursor()
+            cursor.execute('SELECT Link FROM documents')
+            Total_link = cursor.fetchall()
+            Total_link = [t[0] for t in Total_link]
+            self.lcdNumber.display(len(Total_link))
+            self.Search_button.setEnabled(True)
+            self.Button_view_path.setEnabled(True)
+            self.populate_table()
+        else:
+            self.Button_Index.setEnabled(True)
+            self.Button_Index.clicked.connect(self.run_queue)
+    
+    def queue_to_InputDomain(self):
+        self.listWidget.clear()
+        conn = sqlite3.connect(db_dir)
+        cursor = conn.cursor()
+        cursor.execute('SELECT Domain_Link FROM Domain_link')
+        #try:
+            #cursor.execute('SELECT * FROM documents')
+        #except:
+            #print("It's is not my database")
+        Queue_Domain_link = cursor.fetchall()
+        Queue_Domain_link = [t[0] for t in Queue_Domain_link]
+        # Insert data into table
         
+
+        for i in Queue_Domain_link:
+            self.listWidget.addItem(i)
+
+        
+        # Close database connection
+        conn.close()
+
     def run_queue(self):
         self.Button_Index.setEnabled(False)
         self.Button_PAUSE.setEnabled(True)
@@ -604,10 +646,12 @@ class Ui_MainWindow(object):
                     if self.folderpath:
                         break
         self.save_path.setEnabled(False)
+        
         self.textBrowser.clear()
         self.textBrowser.append("Adding Database")
         self.addlinks_into_database()
         self.textBrowser.clear()
+        self.spinBox_Depth.setDisabled(True)
         self.textBrowser.append("Indexing")
 
 
@@ -684,7 +728,6 @@ class Ui_MainWindow(object):
             self.textBrowser.append("Link : "+doc[0])
             self.textBrowser.append("Title : "+doc[1])
             self.textBrowser.append("Location : "+str(doc[2]))
-            print(self.len_queue_scap)
             percent = 100*((self.len_queue_scap - len_Temp)/self.len_queue_scap)
             self.progressBar.setProperty("value", percent)
         except:
@@ -703,6 +746,11 @@ class Ui_MainWindow(object):
         self.update_tf_idf()
         self.textBrowser.append("Finished, Database is ready for Search")
         self.Button_PAUSE.setEnabled(False)
+        self.Button_update.setEnabled(True)
+        self.Button_Remove.setEnabled(True)
+        self.Search_button.setEnabled(True)
+        self.Button_view_path.setEnabled(True)
+        self.populate_table()
 
     def show_queue_indexing(self):
         self.list_queue.clear()
