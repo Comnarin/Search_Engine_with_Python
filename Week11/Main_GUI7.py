@@ -1,5 +1,3 @@
-
-
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QInputDialog, QLineEdit, QListWidgetItem, QMessageBox,QFileDialog,QHeaderView
 from PyQt5.QtCore import QThread, pyqtSignal
@@ -362,6 +360,10 @@ class Ui_MainWindow(object):
         self.Button_CRAWLER.setEnabled(False)
         self.Button_PAUSE.setEnabled(False)
         self.Button_RESUME.setEnabled(False)
+        self.Button_ADD.setEnabled(False)
+        self.Button_EDIT.setEnabled(False)
+        self.Button_REMOVE.setEnabled(False)
+        
 
         self.Button_view_path.clicked.connect(self.openFileNameDialog)
         self.Search_button.clicked.connect(self.search_input)
@@ -487,9 +489,13 @@ class Ui_MainWindow(object):
         self.textBrowser.append("Create Database")
         self.create_db(db_dir)
         self.Button_CRAWLER.setEnabled(True)
-        self.Button_PAUSE.setEnabled(True)
-        self.Button_RESUME.setEnabled(True)
+        self.Button_PAUSE.setEnabled(False)
+        self.Button_RESUME.setEnabled(False)
         self.save_path.setEnabled(False)
+        self.Button_ADD.setEnabled(True)
+        self.Button_EDIT.setEnabled(True)
+        self.Button_REMOVE.setEnabled(True)
+        self.Button_OpenQueue.setEnabled(False)
         self.textBrowser.clear()
         self.textBrowser.append("Create Database Success")
 
@@ -583,11 +589,61 @@ class Ui_MainWindow(object):
                 if i.startswith(j):
                     conn.execute('''INSERT INTO Temp_link (Link) VALUES (?);''', (i,))
                     conn.commit()
+        self.textBrowser.clear()
         self.show_queue()
-        self.temp_to_index()
+        self.textBrowser.append("Create Database succress")
+        self.lcdNumber.display(0)
+        self.value_scrap_link = 0
+        self.Button_Index.setEnabled(False)
+        self.Button_PAUSE.setEnabled(True)
+        self.Button_RESUME.setEnabled(False)
+        self.indexing_thread = IndexingThread()
+        self.indexing_thread.document_processed.connect(self.handle_document_processed)
+        self.indexing_thread.finished.connect(self.handle_indexing_finished)
+        self.indexing_thread.start()
+        self.Button_PAUSE.clicked.connect(self.handle_pause_button)
+        self.Button_RESUME.clicked.connect(self.handle_resume_button)
+        
+
+    def handle_pause_button(self):
+        self.indexing_thread.pause()
+        self.Button_PAUSE.setEnabled(False)
+        self.Button_RESUME.setEnabled(True)
+
+    def handle_resume_button(self):
+        self.textBrowser.clear()
+        self.indexing_thread.resume()
+        self.textBrowser.append("Continue")
+        self.Button_PAUSE.setEnabled(True)
+        self.Button_RESUME.setEnabled(False)
+
+
+    def handle_document_processed(self,doc):
+        # Handle the processed document
+        #print(doc)
+        try:
+            self.value_scrap_link+=1
+            self.lcdNumber.display(self.value_scrap_link)
+            self.textBrowser.clear()
+            self.textBrowser.append("Link : "+doc[0])
+            self.textBrowser.append("Title : "+doc[1])
+            self.textBrowser.append("Location : "+str(doc[2]))
+            self.show_queue()
+        except:
+            self.textBrowser.clear()
+            self.value_scrap_link+=1
+            self.lcdNumber.display(self.value_scrap_link)
+        
+    def handle_indexing_finished(self):
+        # Handle the indexing finished signal
+        self.textBrowser.clear()
+        self.update_tf_idf()
+        print("Finished")
+        self.textBrowser.append("Finished")
+
 
     def show_queue(self):
-        self.textBrowser.clear()
+        self.list_queue.clear()
         conn = sqlite3.connect(db_dir)
         cursor = conn.cursor()
         cursor.execute('SELECT Link FROM Temp_link')
@@ -603,40 +659,11 @@ class Ui_MainWindow(object):
         for i in Temp_link:
             self.list_queue.addItem(i)
 
-        self.textBrowser.append("Database is showing")
+        
         # Close database connection
         conn.close()
 
-    def temp_to_index(self):
-        conn = sqlite3.connect(db_dir)
-        links = conn.execute('SELECT Link FROM temp_link ').fetchall()
-        links = [t[0] for t in links]
-        ref=self.get_ref()
-        for i in links:
-            doc = self.make_doc(i,ref)
-            print(doc)
-            self.insert_to_database([doc])
-            conn.execute('DELETE FROM temp_link WHERE link = ?; ', (i,))
-            conn.commit()
-
-    def insert_to_database(self,doc):
-        conn = sqlite3.connect(db_dir)
-        for i in doc:
-            conn.execute('''INSERT INTO documents (Link, Title, Body, Location, Ref, Time) VALUES (?, ?, ?, ?, ?, ?);''', (str(i['link']), str(i['title']), str(i['body']), str(i['location']), int(i['ref']), datetime.now()))
-            doc_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-            
-            for j in i['word'].keys():
-                word_id = conn.execute("SELECT id FROM words WHERE word = ?", (j,)).fetchone()
-                if not word_id:
-                    conn.execute("INSERT INTO words (word) VALUES (?)", (j,))
-                    word_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-                else:
-                    word_id = word_id[0]
-                
-                conn.execute('''INSERT INTO word_frequencies (word_id, doc_id, Frequency) VALUES (?, ?, ?);''', (word_id, doc_id, i['word'][j]))
-            
-        
-        conn.commit()
+    
      
     def update_button_click(self):
         input_update = self.textEdit_Update.toPlainText()
@@ -861,6 +888,33 @@ class Ui_MainWindow(object):
             ref = web.get_check_ref()
         return ref
     
+    def update_tf_idf(self):
+        conn = sqlite3.connect(db_dir,timeout=3)
+
+        cursor = conn.execute('SELECT COUNT(*) FROM documents')
+        N = cursor.fetchone()[0]
+        
+        cursor = conn.execute('SELECT ID, Word FROM words')
+        words = cursor.fetchall()
+        
+        for word in words:
+            word_id = word[0]
+            word_str = word[1]
+
+            cursor = conn.execute('SELECT Doc_ID, Frequency FROM word_frequencies WHERE Word_ID = ?', (word_id,))
+            doc_freqs = cursor.fetchall()
+
+            df = len(doc_freqs)
+            idf = math.log(N / df)
+
+            for doc_freq in doc_freqs:
+                doc_id = doc_freq[0]
+                tf = doc_freq[1]
+                tf_idf = tf * idf
+                conn.execute('UPDATE word_frequencies SET TF_IDF = ? WHERE Word_ID = ? AND Doc_ID = ?', (tf_idf, word_id, doc_id))
+
+        conn.commit()
+    
     def update_ref(self):
         conn = sqlite3.connect('../Week10/inverted_index2.db')
         domain = conn.execute("SELECT domain_link FROM domain_link ;").fetchall()
@@ -951,6 +1005,193 @@ class Ui_MainWindow(object):
         self.label_Topkeywords.setText(_translate("MainWindow", "Top keywords"))
         self.tabWidget_edit.setTabText(self.tabWidget_edit.indexOf(self.tab_Visualization), _translate("MainWindow", "Visualization"))
 
+class IndexingThread(QThread):
+    finished = pyqtSignal()
+    document_processed = pyqtSignal(list)
+
+    def __init__(self):
+        super().__init__()
+        self.paused = False
+
+    def run(self):
+        self.temp_to_index()
+        self.finished.emit()
+
+    def pause(self):
+        self.paused = True
+
+    def resume(self):
+        self.paused = False
+
+    def temp_to_index(self):
+        conn = sqlite3.connect(db_dir)
+        links = conn.execute('SELECT Link FROM temp_link ').fetchall()
+        links = [t[0] for t in links]
+        ref=self.get_ref()
+        for i in links:
+            if self.paused:
+                # Wait for resume signal
+                while self.paused:
+                    time.sleep(0.1)
+            doc = self.make_doc(i,ref)
+            self.insert_to_database([doc])
+            conn.execute('DELETE FROM temp_link WHERE link = ?; ', (i,))
+            conn.commit()
+            
+
+    def insert_to_database(self,doc):
+        conn = sqlite3.connect(db_dir)
+        for i in doc:
+            conn.execute('''INSERT INTO documents (Link, Title, Body, Location, Ref, Time) VALUES (?, ?, ?, ?, ?, ?);''', (str(i['link']), str(i['title']), str(i['body']), str(i['location']), int(i['ref']), datetime.now()))
+            doc_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            
+            for j in i['word'].keys():
+                word_id = conn.execute("SELECT id FROM words WHERE word = ?", (j,)).fetchone()
+                if not word_id:
+                    conn.execute("INSERT INTO words (word) VALUES (?)", (j,))
+                    word_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+                else:
+                    word_id = word_id[0]
+                
+                conn.execute('''INSERT INTO word_frequencies (word_id, doc_id, Frequency) VALUES (?, ?, ?);''', (word_id, doc_id, i['word'][j]))
+            
+        conn.commit()
+
+
+    def get_ref(self):
+        conn = sqlite3.connect(db_dir)
+        domain = conn.execute("SELECT domain_link FROM domain_link ;").fetchall()
+        domain = [t[0] for t in domain]
+        for i in domain :
+            web = spyder(domain,i,1)
+            ref = web.get_check_ref()
+        return ref
+    
+    def make_doc(self,link,ref):
+        newlink=link.replace(" ", "")
+        d=dict()    
+        body,word,title,location = self.check_lang(newlink)
+        if body == None:
+            body = 'None'
+        self.document_processed.emit([link,title,location])
+        d['link']= link
+        d['title'] = title
+        d['body']=body
+        d['location']=location
+        d['word'] = word
+        for i in ref:
+            
+            if link.startswith(i):
+                d['ref'] = ref[i]
+                
+            else:
+                d['ref'] = 0
+        return d
+    
+    def check_lang(self,url:str):
+        data_lang,title = self.scrap_tags(url)
+        try:
+            percent = pythainlp.util.countthai(data_lang[0][0])
+            if percent >50:
+                thai_nlp = self.Thai(data_lang[0]) 
+                word = thai_nlp.word
+                try:
+                    location = 'จ.'+max(thai_nlp.get_location().keys())
+                except:
+                    location = 'Thailand'
+                new_list = [s.strip().replace('"', '') for s in word if s.strip()]
+                while '' in new_list:
+                    new_list.remove('')
+                word = self.get_word(new_list)
+                return data_lang,word,title,location
+            else:
+                clean_body=self.cleansing(data_lang)
+                body = self.cleansing(data_lang)
+                word = self.get_word(body)
+                location = self.eng_location(data_lang,title)
+                return clean_body,word,title,location
+        except:
+            clean_body=self.cleansing(data_lang)
+            body = self.cleansing(data_lang)
+            word = self.get_word(body)
+            location = self.eng_location(data_lang,title)
+            return clean_body,word,title,location
+        
+    def scrap_tags(self,url):
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        try:
+            title_tag = soup.find('title').text
+        except:
+            title_tag = soup.find('title')
+        try:
+            body_tag = soup.find('body')
+            text_below_body = body_tag.get_text() 
+        except:
+            text_below_body ='Not Found'
+        body_list =[]
+        body_list.append(text_below_body)
+        return (body_list,title_tag)
+
+    def cleansing(self,body):
+        for i in body:
+            output = i.replace('\n', '  ').replace('\xa0', '  ').replace('®', ' ').replace(';', ' ')
+            output = " ".join(output.split())
+        return output 
+
+    def get_word(self,body):
+        words = self.spacy_process(body)
+        word_freq = {}
+        for word in words:
+            if word in word_freq:
+                word_freq[word] += 1
+            else:
+                word_freq[word] = 1
+        return word_freq
+    
+    def spacy_process(self,text):
+        
+        nlp = spacy.load('en_core_web_sm')
+        doc = nlp(text)
+        
+    #Tokenization and lemmatization 
+        lemma_list = []
+        for token in doc:
+            lemma_list.append(token.lemma_)
+        #print("Tokenize+Lemmatize:")
+        #print(lemma_list)
+        
+        #Filter the stopword
+        filtered_sentence =[] 
+        for word in lemma_list:
+            lexeme = nlp.vocab[word]
+            if lexeme.is_stop == False:
+                filtered_sentence.append(word) 
+        
+        #Remove punctuation
+        punctuations="?:!.,;"
+        for word in filtered_sentence:
+            if word in punctuations:
+                filtered_sentence.remove(word)
+        #print(" ")
+        #3print("Remove stopword & punctuation: ")
+        #print(filtered_sentence)
+        return filtered_sentence
+    
+    def eng_location(self,data,title):
+        try:
+            entities = locationtagger.find_locations(text = data[0])
+            location = entities.countries
+            if location == []:
+                entities = locationtagger.find_locations(text = title)
+                location = entities.countries
+                if location ==[]:
+                    location = ['None']
+        except:
+            location = ['None']
+        return location 
+    
+    
 class SpiderThread(QThread):
     finished = pyqtSignal(list)
     progress_signal = pyqtSignal(str)
