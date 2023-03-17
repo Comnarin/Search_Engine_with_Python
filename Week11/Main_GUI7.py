@@ -363,7 +363,7 @@ class Ui_MainWindow(object):
         self.Button_ADD.setEnabled(False)
         self.Button_EDIT.setEnabled(False)
         self.Button_REMOVE.setEnabled(False)
-        
+        self.Button_OpenQueue.clicked.connect(self.openFile_Queue)
 
         self.Button_view_path.clicked.connect(self.openFileNameDialog)
         self.Search_button.clicked.connect(self.search_input)
@@ -499,6 +499,37 @@ class Ui_MainWindow(object):
         self.textBrowser.clear()
         self.textBrowser.append("Create Database Success")
 
+    def openFile_Queue(self):
+        self.Button_view_path.setEnabled(False)
+        while True:
+            file_dialog = QFileDialog()
+            file_dialog.setNameFilter("database file (*.db)")
+            if file_dialog.exec_() == QFileDialog.Accepted:
+                # Get the selected file path
+                self.selected_file = file_dialog.selectedFiles()[0]
+            break
+        self.path_file.setText("Save as: " + self.selected_file)
+        global db_dir
+        db_dir = (self.selected_file)
+        self.show_queue()
+        self.lcdNumber.display(0)
+        self.value_scrap_link = 0
+        self.len_queue_scap = self.show_queue_indexing()
+        self.Button_Index.setEnabled(True)
+        self.Button_Index.clicked.connect(self.run_queue)
+        
+    def run_queue(self):
+        self.Button_Index.setEnabled(False)
+        self.Button_PAUSE.setEnabled(True)
+        self.Button_RESUME.setEnabled(False)
+        self.count_all_links = self.show_queue_indexing()
+        self.indexing_thread = IndexingThread()
+        self.indexing_thread.document_processed.connect(self.handle_document_processed_queue)
+        self.indexing_thread.finished.connect(self.handle_indexing_finished)
+        self.indexing_thread.start()
+        self.Button_PAUSE.clicked.connect(self.handle_pause_button)
+        self.Button_RESUME.clicked.connect(self.handle_resume_button)
+
     def create_db(self,db_dir):
         
         conn = sqlite3.connect(db_dir)
@@ -598,6 +629,7 @@ class Ui_MainWindow(object):
         self.Button_Index.setEnabled(False)
         self.Button_PAUSE.setEnabled(True)
         self.Button_RESUME.setEnabled(False)
+        self.count_all_links = self.show_queue_indexing()
         self.indexing_thread = IndexingThread()
         self.indexing_thread.document_processed.connect(self.handle_document_processed)
         self.indexing_thread.finished.connect(self.handle_indexing_finished)
@@ -626,16 +658,42 @@ class Ui_MainWindow(object):
             self.value_scrap_link+=1
             self.lcdNumber.display(self.value_scrap_link)
             self.textBrowser.clear()
+            len_Temp = self.show_queue_indexing()
+            self.textBrowser.append(str(self.value_scrap_link)+"/"+str(self.count_all_links))
             self.textBrowser.append("Link : "+doc[0])
             self.textBrowser.append("Title : "+doc[1])
             self.textBrowser.append("Location : "+str(doc[2]))
-            len_Temp = self.show_queue_indexing()
+            
             percent = 100*((len(self.scrap_links) - len_Temp)/len(self.scrap_links))
+            self.progressBar.setProperty("value", percent)
+        
+        except:
+            self.textBrowser.clear()
+            self.value_scrap_link+=1
+            self.lcdNumber.display(self.value_scrap_link)
+    
+    def handle_document_processed_queue(self,doc):
+        # Handle the processed document
+        #print(doc)
+        try:
+            self.value_scrap_link+=1
+            self.lcdNumber.display(self.value_scrap_link)
+            self.textBrowser.clear()
+            len_Temp = self.show_queue_indexing()
+            self.textBrowser.append(str(self.value_scrap_link)+"/"+str(self.len_queue_scap))
+            self.textBrowser.append("Link : "+doc[0])
+            self.textBrowser.append("Title : "+doc[1])
+            self.textBrowser.append("Location : "+str(doc[2]))
+            print(self.len_queue_scap)
+            percent = 100*((self.len_queue_scap - len_Temp)/self.len_queue_scap)
             self.progressBar.setProperty("value", percent)
         except:
             self.textBrowser.clear()
             self.value_scrap_link+=1
             self.lcdNumber.display(self.value_scrap_link)
+        
+        
+            
         
     def handle_indexing_finished(self):
         # Handle the indexing finished signal
@@ -643,8 +701,8 @@ class Ui_MainWindow(object):
         self.progressBar.setProperty("value", 100)
         self.textBrowser.clear()
         self.update_tf_idf()
-        print("Finished")
-        self.textBrowser.append("Finished")
+        self.textBrowser.append("Finished, Database is ready for Search")
+        self.Button_PAUSE.setEnabled(False)
 
     def show_queue_indexing(self):
         self.list_queue.clear()
@@ -943,7 +1001,7 @@ class Ui_MainWindow(object):
         conn.commit()
     
     def update_ref(self):
-        conn = sqlite3.connect('../Week10/inverted_index2.db')
+        conn = sqlite3.connect(db_dir)
         domain = conn.execute("SELECT domain_link FROM domain_link ;").fetchall()
         domain = [t[0] for t in domain]
         for i in domain :
@@ -1301,12 +1359,12 @@ class spyder2():
                     visited.add(link)
                     if link.startswith(url):
                         self.crawl(link, n=n, depth=depth+1, visited=visited)
-                    self.progress_signal.emit(link)
-                    self.crawled_links += 1
-                    #self.counter += 1 # increment counter variable
-                    self.count_links_signal.emit([self.crawled_links,url])
-                    
-                    #self.lcd_Number.display(self.counter) # update LCD number
+                        self.progress_signal.emit(link)
+                        self.crawled_links += 1
+                        #self.counter += 1 # increment counter variable
+                        self.count_links_signal.emit([self.crawled_links,url])
+                        
+                        #self.lcd_Number.display(self.counter) # update LCD number
         return visited
 
     def get_crawler(self):
