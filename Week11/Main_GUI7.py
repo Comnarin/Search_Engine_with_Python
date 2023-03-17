@@ -995,6 +995,7 @@ class LinkThread(QThread):
         self.result_crawler = web_spyder.get_crawler()
         self.each_links_finished.emit(1)
         
+        
 
 class spyder2():
     def __init__(self, links, base_url, depth, progress_signal, count_links_signal):
