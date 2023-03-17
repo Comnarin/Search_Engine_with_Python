@@ -358,6 +358,10 @@ class Ui_MainWindow(object):
         self.save_path.clicked.connect(self.openFileSave)
         self.Button_Index.setEnabled(False)
         self.folderpath = None
+        self.textBrowser.append("Please Select directory")
+        self.Button_CRAWLER.setEnabled(False)
+        self.Button_PAUSE.setEnabled(False)
+        self.Button_RESUME.setEnabled(False)
 
         self.Button_view_path.clicked.connect(self.openFileNameDialog)
         self.Search_button.clicked.connect(self.search_input)
@@ -479,9 +483,12 @@ class Ui_MainWindow(object):
         self.path_file.setText("Save as: " + self.folderpath)
         global db_dir
         db_dir = (self.folderpath+'/inverted_index.db')
+        self.textBrowser.clear()
         self.textBrowser.append("Create Database")
         self.create_db(db_dir)
-
+        self.Button_CRAWLER.setEnabled(True)
+        self.Button_PAUSE.setEnabled(True)
+        self.Button_RESUME.setEnabled(True)
         self.save_path.setEnabled(False)
         self.textBrowser.clear()
         self.textBrowser.append("Create Database Success")
