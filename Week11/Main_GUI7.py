@@ -1,19 +1,30 @@
+
+
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtWidgets import QInputDialog, QLineEdit, QListWidgetItem, QMessageBox,QFileDialog,QHeaderView
+from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5 import QtCore, QtGui, QtWidgets
+
+import locationtagger
+import pythainlp.util
+from pythainlp.summarize import summarize
+from urllib.parse import urljoin
+import time
+from pythainlp.tag import tag_provinces
+from pythainlp.tokenize import word_tokenize as tokenizer
+
+from datetime import datetime
+import math
 import requests
 from bs4 import BeautifulSoup
 import time
 from urllib.parse import urljoin
+import sqlite3
 
 import spacy
 from spacy.tokenizer import Tokenizer
 from spacy.lang.en import English
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QInputDialog, QLineEdit, QListWidgetItem, QMessageBox,QFileDialog,QHeaderView
-from PyQt5.QtCore import QThread, pyqtSignal
-
-from PyQt5 import QtCore, QtGui, QtWidgets
-import math
-import sqlite3
 
 
 class Ui_MainWindow(object):
@@ -345,7 +356,7 @@ class Ui_MainWindow(object):
         self.Button_REMOVE.clicked.connect(self.removelink)
         self.Button_CRAWLER.clicked.connect(self.clicked_start)
         self.save_path.clicked.connect(self.openFileSave)
-        self.Button_Index.clicked.connect(self.clicked_Index)
+        self.Button_Index.setEnabled(False)
         self.folderpath = None
 
         self.Button_view_path.clicked.connect(self.openFileNameDialog)
@@ -388,6 +399,7 @@ class Ui_MainWindow(object):
     def clicked_start(self):
         
         self.textBrowser.clear()
+        
         self.Button_CRAWLER.setEnabled(False)
         self.Button_ADD.setEnabled(False)
         self.Button_EDIT.setEnabled(False)
@@ -404,6 +416,7 @@ class Ui_MainWindow(object):
         for i in range(self.listWidget.count()):
             item = self.listWidget.item(i)
             target_links.append(item.text())
+        self.Craw_Domain()
         depth_value = self.spinBox_Depth.value()
 
         
@@ -419,6 +432,13 @@ class Ui_MainWindow(object):
         self.thread.finished.connect(lambda: self.Button_Index.setEnabled(True))
         self.thread.start()
 
+    def Craw_Domain(self):
+        conn = sqlite3.connect(db_dir)
+        for j in target_links:
+            domain = conn.execute("SELECT id FROM domain_link  WHERE domain_link  = ?", (j,)).fetchone()
+            if not domain:
+                conn.execute("INSERT INTO domain_link (domain_link) VALUES (?)", (j,))
+                conn.commit()
 
     def count_links_scraping(self,each_links_finished):
         #self.lcdNumber.display(count_links) 
@@ -446,6 +466,7 @@ class Ui_MainWindow(object):
         self.lcdNumber.display(len(domain_links))
         self.label_Total.setText("Total")
         self.progressBar.setProperty("value", 100)
+        self.Button_Index.clicked.connect(self.clicked_Index)
         self.Button_Index.setEnabled(True)
 
             
@@ -458,17 +479,63 @@ class Ui_MainWindow(object):
         self.path_file.setText("Save as: " + self.folderpath)
         global db_dir
         db_dir = (self.folderpath+'/inverted_index.db')
+        self.textBrowser.append("Create Database")
+        self.create_db(db_dir)
+
+        self.save_path.setEnabled(False)
+        self.textBrowser.clear()
+        self.textBrowser.append("Create Database Success")
+
+    def create_db(self,db_dir):
+        
         conn = sqlite3.connect(db_dir)
 
+        # Create tables for words, documents, and word frequencies
+
         conn.execute('''
-        CREATE TABLE Temp_Link (
+        CREATE TABLE words (
+            ID INTEGER PRIMARY KEY,
+            Word TEXT NOT NULL UNIQUE
+        );
+        ''')
+
+        conn.execute('''
+        CREATE TABLE documents (
+            ID INTEGER PRIMARY KEY,
+            Link TEXT NOT NULL UNIQUE ,
+            Title TEXT,
+            Body TEXT,
+            Location TEXT,
+            Ref INT,
+            Time TEXT
+        );
+        ''')
+
+        conn.execute('''
+        CREATE TABLE word_frequencies (
+            Word_ID INTEGER ,
+            Doc_ID INTEGER ,
+            Frequency INTEGER NOT NULL,
+            TF_IDF REAL ,
+            PRIMARY KEY (word_id, doc_id),
+            FOREIGN KEY (word_id) REFERENCES words(id),
+            FOREIGN KEY (doc_id) REFERENCES documents(id)
+        );
+        ''')
+        conn.execute('''
+        CREATE TABLE Temp_link(
             ID INTEGER PRIMARY KEY,
             Link TEXT NOT NULL UNIQUE
         );
         ''')
 
+        conn.execute('''
+        CREATE TABLE Domain_link(
+            ID INTEGER PRIMARY KEY,
+            Domain_Link TEXT NOT NULL UNIQUE
+        );
+        ''')
         conn.commit()
-        self.save_path.setEnabled(False)
 
     def clicked_Index(self):
         self.textBrowser.clear()
@@ -479,16 +546,12 @@ class Ui_MainWindow(object):
                 self.path_file.setText("Save as: " + self.folderpath)
                 global db_dir
                 db_dir = (self.folderpath+'/inverted_index.db')
-                conn = sqlite3.connect(db_dir)
+                self.textBrowser.append("Create Database")
+                self.create_db(db_dir)
 
-                conn.execute('''
-                CREATE TABLE Temp_Link (
-                    ID INTEGER PRIMARY KEY,
-                    Link TEXT NOT NULL UNIQUE
-                );
-                ''')
-
-                conn.commit()
+                self.save_path.setEnabled(False)
+                self.textBrowser.clear()
+                self.textBrowser.append("Create Database Success")
             else:
                 while True:
                     self.path_file.setText("No directory selected")
@@ -496,17 +559,25 @@ class Ui_MainWindow(object):
                     if self.folderpath:
                         break
         self.save_path.setEnabled(False)
+        self.textBrowser.clear()
         self.textBrowser.append("Adding Database")
         self.addlinks_into_database()
+        self.textBrowser.clear()
         self.textBrowser.append("Indexing")
 
 
     def addlinks_into_database(self):
         conn = sqlite3.connect(db_dir)
-        for i in self.scrap_links:
-            conn.execute('''INSERT INTO Temp_link (Link) VALUES (?);''', (i,))
-            conn.commit()
+        links = self.scrap_links
+        domain = conn.execute('select domain_link from domain_link').fetchall()
+        domain = [t[0] for t in domain]
+        for i in links :
+            for j in domain:
+                if i.startswith(j):
+                    conn.execute('''INSERT INTO Temp_link (Link) VALUES (?);''', (i,))
+                    conn.commit()
         self.show_queue()
+        self.temp_to_index()
 
     def show_queue(self):
         self.textBrowser.clear()
@@ -528,7 +599,38 @@ class Ui_MainWindow(object):
         self.textBrowser.append("Database is showing")
         # Close database connection
         conn.close()
-    
+
+    def temp_to_index(self):
+        conn = sqlite3.connect(db_dir)
+        links = conn.execute('SELECT Link FROM temp_link ').fetchall()
+        links = [t[0] for t in links]
+        ref=self.get_ref()
+        for i in links:
+            doc = self.make_doc(i,ref)
+            print(doc)
+            self.insert_to_database([doc])
+            conn.execute('DELETE FROM temp_link WHERE link = ?; ', (i,))
+            conn.commit()
+
+    def insert_to_database(self,doc):
+        conn = sqlite3.connect(db_dir)
+        for i in doc:
+            conn.execute('''INSERT INTO documents (Link, Title, Body, Location, Ref, Time) VALUES (?, ?, ?, ?, ?, ?);''', (str(i['link']), str(i['title']), str(i['body']), str(i['location']), int(i['ref']), datetime.now()))
+            doc_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            
+            for j in i['word'].keys():
+                word_id = conn.execute("SELECT id FROM words WHERE word = ?", (j,)).fetchone()
+                if not word_id:
+                    conn.execute("INSERT INTO words (word) VALUES (?)", (j,))
+                    word_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+                else:
+                    word_id = word_id[0]
+                
+                conn.execute('''INSERT INTO word_frequencies (word_id, doc_id, Frequency) VALUES (?, ?, ?);''', (word_id, doc_id, i['word'][j]))
+            
+        
+        conn.commit()
+     
     def update_button_click(self):
         input_update = self.textEdit_Update.toPlainText()
         print(input_update)
@@ -658,6 +760,7 @@ class Ui_MainWindow(object):
         
     
     def spacy_process(self,text):
+        
         nlp = spacy.load('en_core_web_sm')
         doc = nlp(text)
         
@@ -701,59 +804,114 @@ class Ui_MainWindow(object):
                 word_freq[word] = 1
         return word_freq
     
-    def scrape_tags(self,url):
+    def scrap_tags(self,url):
         response = requests.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
         try:
             title_tag = soup.find('title').text
         except:
             title_tag = soup.find('title')
-        body_tag = soup.find('body')
-        text_below_body = body_tag.get_text() 
+        try:
+            body_tag = soup.find('body')
+            text_below_body = body_tag.get_text() 
+        except:
+            text_below_body ='Not Found'
         body_list =[]
         body_list.append(text_below_body)
         return (body_list,title_tag)
     
-    def make_doc(self,link,target_links):
-        #print(link)
-        link.replace(" ", "")
-        d=dict()
-        #self.textBrowser.clear()
-        body, title = self.scrape_tags(link)
-        body=self.cleansing(body)
-        word = self.get_word(body)
-        #self.textBrowser.append(str(body))
-        #self.textBrowser.append(str(word))
-
+    def make_doc(self,link,ref):
+        self.textBrowser.clear()
+        newlink=link.replace(" ", "")
+        d=dict()    
+        body,word,title,location = self.check_lang(newlink)
+        if body == None:
+            body = 'None'
+        self.textBrowser.append("Link : "+link)
+        self.textBrowser.append("Title : "+title)
+        self.textBrowser.append("Location : "+str(location))
         d['link']= link
         d['title'] = title
         d['body']=body
-        d['location']='location'
+        d['location']=location
         d['word'] = word
-        
-        
-        for k in target_links:
-            if link.startswith(k):
-                d['ref'] = target_links[k]
-        #print(d)
+        for i in ref:
+            
+            if link.startswith(i):
+                d['ref'] = ref[i]
+                
+            else:
+                d['ref'] = 0
         return d
 
     
-    def get_doc(self,target_links,n):
-        doc=[]
-        num=0
-        for i in target_links:
-            print(target_links,i,n)
-            web_spyder=spyder(target_links,i,n)
-            domain_links,target_links =web_spyder.get_all()
-            print('all link =', len(domain_links))
-            for j in domain_links:
-                num+=1
-                d = self.make_doc(j,target_links)
-                doc.append(d)
-                #self.lcdNumber.display(num)
-                print(num)
-        return doc
+    def get_ref(self):
+        conn = sqlite3.connect(db_dir)
+        domain = conn.execute("SELECT domain_link FROM domain_link ;").fetchall()
+        domain = [t[0] for t in domain]
+        for i in domain :
+            web = spyder(domain,i,1)
+            ref = web.get_check_ref()
+        return ref
+    
+    def update_ref(self):
+        conn = sqlite3.connect('../Week10/inverted_index2.db')
+        domain = conn.execute("SELECT domain_link FROM domain_link ;").fetchall()
+        domain = [t[0] for t in domain]
+        for i in domain :
+            web = spyder(domain,i,1)
+            ref = web.get_check_ref()
+        check_link = conn.execute("SELECT link FROM documents ;").fetchall()
+        check_link = [t[0] for t in check_link]
+        for j in check_link:
+            for k in ref:
+                if j.startswith(k):
+                    conn.execute('UPDATE documents SET REF = ? WHERE link = ? ', (ref[k], j,))
+        conn.commit()
+
+    def eng_location(self,data,title):
+        try:
+            entities = locationtagger.find_locations(text = data[0])
+            location = entities.countries
+            if location == []:
+                entities = locationtagger.find_locations(text = title)
+                location = entities.countries
+                if location ==[]:
+                    location = ['None']
+        except:
+            location = ['None']
+        return location 
+    
+    def check_lang(self,url:str):
+        data_lang,title = self.scrap_tags(url)
+        try:
+            percent = pythainlp.util.countthai(data_lang[0][0])
+            if percent >50:
+                thai_nlp = self.Thai(data_lang[0]) 
+                word = thai_nlp.word
+                try:
+                    location = 'จ.'+max(thai_nlp.get_location().keys())
+                except:
+                    location = 'Thailand'
+                new_list = [s.strip().replace('"', '') for s in word if s.strip()]
+                while '' in new_list:
+                    new_list.remove('')
+                word = self.get_word(new_list)
+                return data_lang,word,title,location
+            else:
+                clean_body=self.cleansing(data_lang)
+                body = self.cleansing(data_lang)
+                word = self.get_word(body)
+                location = self.eng_location(data_lang,title)
+                return clean_body,word,title,location
+        except:
+            clean_body=self.cleansing(data_lang)
+            body = self.cleansing(data_lang)
+            word = self.get_word(body)
+            location = self.eng_location(data_lang,title)
+            return clean_body,word,title,location
+        
+    
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
@@ -826,12 +984,12 @@ class LinkThread(QThread):
         
     def run(self):
         
-        web_spyder = spyder([self.link], self.link, self.depth, self.progress_signal, self.count_links_signal)  # <-- pass progress_signal to spyder
+        web_spyder = spyder2([self.link], self.link, self.depth, self.progress_signal, self.count_links_signal)  # <-- pass progress_signal to spyder
         self.result_crawler = web_spyder.get_crawler()
         self.each_links_finished.emit(1)
         
 
-class spyder():
+class spyder2():
     def __init__(self, links, base_url, depth, progress_signal, count_links_signal):
         self.progress_signal = progress_signal
         self.count_links_signal = count_links_signal
@@ -922,6 +1080,105 @@ class spyder():
                 if i.startswith(j):
                     target_links[j]+=1
         return target_links
+
+class spyder:
+    def __init__( self ,links,base_url,depth ):
+        self.base_url = base_url
+        target_links={}
+        for i in links:
+            target_links[i]=0 
+        self.target_links = target_links
+        self.depth = depth
+    
+    def get_crawler(self):
+        self.result_crawler = self.crawl(self.base_url,self.depth,0,set())
+        return self.result_crawler
+    
+    def get_check_domain(self):
+        self.check_domain_result = self.check_domain(self.base_url,self.get_crawler())
+        return self.check_domain_result
+    
+    def get_check_not_domain(self):
+        self.check_not_domain_result = self.check_not_domain(self.base_url,self.get_crawler())   
+        return self.check_not_domain_result
+    
+    def get_check_ref(self):
+        self.check_ref_result = self.check_ref(self.get_check_not_domain(),self.target_links)
+        return self.check_ref_result
+    
+    def crawl(self,url,n, depth,visited):
+        if depth < n :
+            visited.add(url)
+            headers = {'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246"}
+            time.sleep(0.3)
+            response = requests.get(url,headers=headers)
+            try:
+                soup = BeautifulSoup(response.text, 'html.parser')
+            except:
+                soup = BeautifulSoup(response.text, 'lxml')
+            links = soup.find_all('a')
+            links = [link.get('href') for link in links if link.get('href') and not link.get('href').startswith('#')]
+            links = [urljoin(url, link) for link in links if link]
+
+            for link in links:
+                if link not in visited:
+                    link = link.replace(' ','')
+                    visited.add(link)
+                    if link.startswith(url):
+                        self.crawl(link,n=n,depth=depth+1, visited=visited)
+        return visited
+    
+    def check_domain(self,base_url,links):
+        result= set()
+        for link in links :
+            if link.startswith(base_url):
+                result.add(link)
+        return result
+    
+    def check_not_domain(self,base_url,links):
+        result= set()
+        for link in links :
+            if not link.startswith(base_url):
+                result.add(link)
+        return result
+    
+    def check_ref(self,links,target_links):
+        for i in links:
+            for j in target_links:
+                if i.startswith(j):
+                    target_links[j]+=1
+        return target_links
+    
+class Thai:
+    def __init__(self,data:list):
+        self.data_value = data
+        self.sentence = self.get_sentence()
+        self.summarize = self.get_summarize()
+        self.word = self.get_word() 
+    def make_sentence(self,list_word):
+        list_word = [list_word]
+        self.sentence_value = ''
+        for i in list_word:
+            for i in list_word:
+                if pythainlp.util.countthai(i)<10:
+                    list_word.remove(i)
+        self.sentence_value = ' '.join(list_word)
+        return self.sentence_value
+    def get_sentence(self):
+        self.sentence_result = self.make_sentence(self.data_value)
+        return self.sentence_result
+    def get_word(self):
+        self.word_value = tokenizer(self.sentence, engine="newmm")
+        return self.word_value
+    def get_summarize(self):
+        self.summarize_result =[]
+        self.summarize_result = summarize(self.sentence,n=5)
+        return self.summarize_result
+    def location(self):
+        self.data = self.get_tokenize()
+        self.location_value = tag_provinces(self.data)
+        self.Result_location = [entry for entry in self.location_value if entry[1] == 'B-LOCATION']
+        return self.Result_location
     
 if __name__ == "__main__":
     import sys
