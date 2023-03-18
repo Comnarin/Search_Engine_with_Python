@@ -689,6 +689,7 @@ class Ui_MainWindow(object):
 
     def handle_pause_button(self):
         self.indexing_thread.pause()
+        self.show_queue()
         self.Button_PAUSE.setEnabled(False)
         self.Button_RESUME.setEnabled(True)
 
@@ -1222,14 +1223,14 @@ class IndexingThread(QThread):
         links = [t[0] for t in links]
         ref=self.get_ref()
         for i in links:
-            if self.paused:
-                # Wait for resume signal
-                while self.paused:
-                    time.sleep(0.1)
             doc = self.make_doc(i,ref)
             self.insert_to_database([doc])
             conn.execute('DELETE FROM temp_link WHERE link = ?; ', (i,))
             conn.commit()
+            if self.paused:
+                # Wait for resume signal
+                while self.paused:
+                    time.sleep(0.1)
             
 
     def insert_to_database(self,doc):
