@@ -506,7 +506,7 @@ class Ui_MainWindow(object):
         self.textBrowser.append("Create Database Success")
 
     def openFile_Queue(self):
-        self.Button_view_path.setEnabled(False)
+        self.Button_view_path.setEnabled(True)
         while True:
             file_dialog = QFileDialog()
             file_dialog.setNameFilter("database file (*.db)")
@@ -688,9 +688,12 @@ class Ui_MainWindow(object):
         
 
     def handle_pause_button(self):
+        self.show_queue()
         self.indexing_thread.pause()
         self.Button_PAUSE.setEnabled(False)
         self.Button_RESUME.setEnabled(True)
+        
+        
 
     def handle_resume_button(self):
         self.textBrowser.clear()
@@ -848,6 +851,7 @@ class Ui_MainWindow(object):
         self.textBrowser_Console_Edit.append(input_remove)
 
     def openFileNameDialog(self):
+        self.update_tf_idf()
         options = QFileDialog.Options()
         #options |= QFileDialog.DontUseNativeDialog
         fileName, _ = QFileDialog.getOpenFileName(MainWindow,"Openfile", "","database file (*.db);;sqlite file (*.sqlite3)", options=options)
