@@ -1,7 +1,9 @@
+from PyQt5 import QtCore, QtGui, QtWidgets, QtWebEngineWidgets
+from PyQt5.QtWidgets import QInputDialog, QLineEdit, QListWidgetItem, QMessageBox,QFileDialog,QHeaderView, QTableWidgetItem,QDialog
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtCore import QThread, pyqtSignal,QUrl
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QInputDialog, QLineEdit, QListWidgetItem, QMessageBox,QFileDialog,QHeaderView
-from PyQt5.QtCore import QThread, pyqtSignal
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import QUrl
 
 import locationtagger
 import pythainlp.util
@@ -18,12 +20,16 @@ from bs4 import BeautifulSoup
 import time
 from urllib.parse import urljoin
 import sqlite3
+import webbrowser
 
 import spacy
 from spacy.tokenizer import Tokenizer
 from spacy.lang.en import English
 
-
+import plotly.graph_objs as go
+import plotly.offline as offline
+from geopy.geocoders import Nominatim
+geolocator = Nominatim(user_agent="geoapiExercises")
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -229,7 +235,7 @@ class Ui_MainWindow(object):
         self.Search_button.setFont(font)
         self.Search_button.setObjectName("Search_button")
         self.verticalLayout_3.addWidget(self.splitter)
-        self.label_data = QtWidgets.QLabel(self.tab_Search)
+        self.label_data = QtWidgets.QLabel(self.tab_Search)     
         font = QtGui.QFont()
         font.setPointSize(30)
         self.label_data.setFont(font)
@@ -237,6 +243,7 @@ class Ui_MainWindow(object):
         self.label_data.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
         self.label_data.setObjectName("label_data")
         self.verticalLayout_3.addWidget(self.label_data)
+
         self.table_showDatabase = QtWidgets.QTableWidget(self.tab_Search)
         self.table_showDatabase.setObjectName("table_showDatabase")
         self.table_showDatabase.setColumnCount(0)
@@ -325,9 +332,26 @@ class Ui_MainWindow(object):
         self.label_Spatial.setFont(font)
         self.label_Spatial.setObjectName("label_Spatial")
         self.gridLayout_5.addWidget(self.label_Spatial, 0, 0, 1, 1)
-        self.graphicsView_spatial = QtWidgets.QGraphicsView(self.tab_Visualization)
-        self.graphicsView_spatial.setObjectName("graphicsView_spatial")
-        self.gridLayout_5.addWidget(self.graphicsView_spatial, 1, 0, 1, 1)
+
+        
+        #self.graphicsView_spatial = QWebEngineView()
+        #self.graphicsView_spatial = QtWidgets.QGraphicsView(self.tab_Visualization)
+        #self.graphicsView_spatial.setObjectName("graphicsView_spatial")
+        #self.gridLayout_5.addWidget(self.graphicsView_spatial, 1, 0, 1, 1)
+        #url = "http://www.bbc.com'"
+        #self.graphicsView_spatial.load(QUrl(url))
+        
+        self.web_engine_view = QWebEngineView(self.tab_Visualization)
+        self.web_engine_view.setObjectName("web_engine_view")
+        self.gridLayout_5.addWidget(self.web_engine_view, 1, 0, 1, 1)
+
+        # Load and display www.google.com
+        #self.web_engine_view.load(QUrl("https://www.google.com/"))
+        # Set the minimum and maximum size
+        self.web_engine_view.setMinimumSize(982, 355)
+        #self.web_engine_view.setMaximumSize(200, 200)
+
+
         self.label_Topkeywords = QtWidgets.QLabel(self.tab_Visualization)
         font = QtGui.QFont()
         font.setPointSize(20)
@@ -373,6 +397,11 @@ class Ui_MainWindow(object):
 
         self.Button_update.clicked.connect(self.update_button_click)
         self.Button_Remove.clicked.connect(self.remove_button_click)
+        self.progressBar_Update.setProperty("value", 0)
+        self.progressBar_Remove.setProperty("value", 0)
+        
+        # create a QWebEngineView widget
+        self.webView = QtWebEngineWidgets.QWebEngineView()
 
     def load_input_domain(self):
         domainlinks = ['http://www.bbc.com','http://www.thairath.co.th']
@@ -420,7 +449,8 @@ class Ui_MainWindow(object):
         self.Button_OpenQueue.setEnabled(False)
         self.Button_PAUSE.setEnabled(False)
         self.Button_Index.setEnabled(False)
-         
+        # Record the start time
+        self.start_time = time.time()
         self.textBrowser.append("Starting Scrap ..........")
         self.progressBar.setProperty("value", 10)
         global target_links 
@@ -443,6 +473,7 @@ class Ui_MainWindow(object):
         self.thread.finished.connect(self.update_ui)
         self.thread.finished.connect(lambda: self.Button_Index.setEnabled(True))
         self.thread.start()
+        
 
     def Craw_Domain(self):
         conn = sqlite3.connect(db_dir)
@@ -475,9 +506,15 @@ class Ui_MainWindow(object):
         self.scrap_links = domain_links
         for i in self.scrap_links:
             self.textBrowser.append(i)
+        self.end_time = time.time()
+        # Calculate the time taken
+        self.time_taken = self.end_time - self.start_time
+
+        # Print the time taken
         self.lcdNumber.display(len(domain_links))
         self.label_Total.setText("Total")
         self.progressBar.setProperty("value", 100)
+        self.textBrowser.append("Time Crawler: {:.2f}".format(self.time_taken)+" second ")
         self.Button_Index.clicked.connect(self.clicked_Index)
         self.Button_Index.setEnabled(True)
 
@@ -524,9 +561,9 @@ class Ui_MainWindow(object):
         self.progressBar.setProperty("value", 0)
         self.queue_to_InputDomain()
         self.show_queue()
-        self.lcdNumber.display(0)
         self.value_scrap_link = 0
         self.len_queue_scap = self.show_queue_indexing()
+        self.lcdNumber.display(self.len_queue_scap)
         if self.len_queue_scap == 0:
             self.textBrowser.append("Database is ready to Search")
             conn = sqlite3.connect(db_dir)
@@ -678,6 +715,7 @@ class Ui_MainWindow(object):
         self.Button_Index.setEnabled(False)
         self.Button_PAUSE.setEnabled(True)
         self.Button_RESUME.setEnabled(False)
+        self.Button_view_path.setEnabled(True)
         self.count_all_links = self.show_queue_indexing()
         self.indexing_thread = IndexingThread()
         self.indexing_thread.document_processed.connect(self.handle_document_processed)
@@ -688,7 +726,6 @@ class Ui_MainWindow(object):
         
 
     def handle_pause_button(self):
-        self.show_queue()
         self.indexing_thread.pause()
         self.show_queue()
         self.Button_PAUSE.setEnabled(False)
@@ -717,7 +754,7 @@ class Ui_MainWindow(object):
             self.textBrowser.append("Title : "+doc[1])
             self.textBrowser.append("Location : "+str(doc[2]))
             
-            percent = 100*((len(self.scrap_links) - len_Temp)/len(self.scrap_links))
+            percent = 100*((self.count_all_links - len_Temp)/self.count_all_links)
             self.progressBar.setProperty("value", percent)
         
         except:
@@ -810,18 +847,23 @@ class Ui_MainWindow(object):
     def update_button_click(self):
         input_update = self.textEdit_Update.toPlainText()
         self.textBrowser_Console_Edit.clear()
-        self.textBrowser_Console_Edit.append("Updating...")
-
+        self.textBrowser_Console_Edit.append("Updating... "+str(input_update))
+        self.progressBar_Update.setProperty("value", 50)
         # Create the UpdateThread and connect signals
         self.update_thread = UpdateThread(input_update)
         self.update_thread.finished.connect(self.update_finished)
         self.update_thread.console_updated.connect(self.update_console)
-
         # Start the thread
         self.update_thread.start()
 
     def update_finished(self):
+        self.textBrowser_Console_Edit.clear()
+        self.textEdit_Update.clear()
         self.textBrowser_Console_Edit.append("Update complete.")
+        self.progressBar_Update.setProperty("value", 100)
+        self.update_tf_idf()
+        self.populate_table()
+        self.progressBar_Update.setProperty("value", 0)
 
     def update_console(self, message):
         self.textBrowser_Console_Edit.append(message)
@@ -847,20 +889,65 @@ class Ui_MainWindow(object):
 
     def remove_button_click(self):
         input_remove = self.textEdit_Remove.toPlainText()
-        print(input_remove)
+
         self.textBrowser_Console_Edit.clear()
-        self.textBrowser_Console_Edit.append(input_remove)
+        self.textBrowser_Console_Edit.append("Remove... "+str(input_remove))
+        self.progressBar_Remove.setProperty("value", 50)
+
+        self.thread_Remove = DeleteDataThread(input_remove)
+        self.thread_Remove.finished.connect(self.handle_delete_finished)
+        self.thread_Remove.start()
+
+    def handle_delete_finished(self):
+        self.textBrowser_Console_Edit.clear()
+        self.textEdit_Remove.clear()
+        self.textBrowser_Console_Edit.append("Remove complete.")
+        self.progressBar_Remove.setProperty("value", 100)
+        self.update_tf_idf()
+        self.populate_table()
+        self.progressBar_Remove.setProperty("value", 0)
+
+   
+
+    def OpenLink(self,item):
+        link_open = self.table_showDatabase.item(item.row(), item.column())
+        if item.column() == 0:
+            webbrowser.open(link_open.text())
+        '''
+        if item.column() == 0:
+            # create a new dialog
+            dialog = QtWidgets.QDialog(self)
+            dialog.setWindowTitle("Link")
+            dialog.setModal(True)
+            dialog.resize(800, 600)
+            
+            # create a QWebEngineView widget and set it as the central widget of the dialog
+            webview = QtWebEngineWidgets.QWebEngineView(dialog)
+            dialog.setCentralWidget(webview)
+            
+            # load the link into the webview
+            webview.load(QtCore.QUrl(link_open.text()))
+            
+            # show the dialog
+            dialog.exec_()'''
+        
+        
 
     def openFileNameDialog(self):
-        self.update_tf_idf()
         options = QFileDialog.Options()
         #options |= QFileDialog.DontUseNativeDialog
         fileName, _ = QFileDialog.getOpenFileName(MainWindow,"Openfile", "","database file (*.db);;sqlite file (*.sqlite3)", options=options)
+        self.Button_Remove.setEnabled(True)
+        self.Button_update.setEnabled(True)
+        
         if fileName:
             self.file_name = fileName
-            print(self.file_name)
-        
+            global db_dir
+            db_dir = (self.file_name)
+            self.update_tf_idf()
+            self.update_ref()
             self.populate_table()
+            
         '''   
          # Call method to populate table with data from database
         try:
@@ -883,16 +970,35 @@ class Ui_MainWindow(object):
         # Connect to database and execute SELECT statement
         conn = sqlite3.connect(db_dir)
         cursor = conn.cursor()
-        cursor.execute('SELECT * FROM documents')
+        cursor.execute('SELECT Link,Title,Body,Location FROM documents')
         #try:
             #cursor.execute('SELECT * FROM documents')
         #except:
             #print("It's is not my database")
         documents = cursor.fetchall()
         # Insert data into table
-        
-        self.table_showDatabase.setColumnCount(len(documents[0]))
-        self.table_showDatabase.setRowCount(len(documents))
+            # set the column names
+        try:
+            column_names = ['Link', 'Title', 'Body', 'Location']
+            self.table_showDatabase.setHorizontalHeaderLabels(column_names)
+            #self.table_showDatabase.setColumnCount(len(documents[0]))
+            self.table_showDatabase.setColumnCount(4)
+            self.table_showDatabase.setColumnWidth(0,210)
+            self.table_showDatabase.setColumnWidth(1,300)
+            self.table_showDatabase.setColumnWidth(2,300)
+            self.table_showDatabase.setRowCount(len(documents))
+            self.table_showDatabase.itemDoubleClicked.connect(self.OpenLink)
+            self.table_showDatabase.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        except:
+            # create a QMessageBox object
+            alert = QMessageBox()
+            
+            # set the message box text and tyspe of alert
+            alert.setText("database doesn't match!")
+            alert.setIcon(QMessageBox.Warning)
+            
+            # display the alert box  
+            alert.exec_()
 
         for row in range(len(documents)):
             for col in range(len(documents[0])):
@@ -909,7 +1015,12 @@ class Ui_MainWindow(object):
         print(input_value.lower())
         Result_search = []
         Result_search = self.sentence_search(input_value.lower())
-        self.table_showDatabase.setColumnCount(0)
+        Location_serch = self.location_search(input_value.lower())
+        Location_Result = self.group_location(Location_serch)
+        print(Location_Result)
+        self.table_showDatabase.setColumnCount(2)
+        self.table_showDatabase.setColumnWidth(0,500)
+        self.table_showDatabase.setColumnWidth(1,500)
         self.table_showDatabase.setRowCount(0)
         try:
             self.table_showDatabase.setColumnCount(len(Result_search[0]))
@@ -917,21 +1028,49 @@ class Ui_MainWindow(object):
             for row in range(len(Result_search)):
                 for col in range(len(Result_search[0])):
                     self.table_showDatabase.setItem(row, col, QtWidgets.QTableWidgetItem(str(Result_search[row][col])))
+            self.plot_spatial(Location_Result)
         except:
             error = "Not found"
             self.table_showDatabase.setColumnCount(1)
+            self.table_showDatabase.setColumnWidth(0,1000)
             self.table_showDatabase.setRowCount(1)
             for row in range(1):
                 for col in range(1):
                     self.table_showDatabase.setItem(row, col, QtWidgets.QTableWidgetItem(str(error)))
             
-           
+    def plot_spatial(self,title):
+        print(title)
+        ladd1 = title
+        ladd2 = "China"
+        #print("Location address:",ladd1)
+        location = geolocator.geocode("bangkok")
+        location2 = geolocator.geocode(ladd2)
+        #print("Latitude and Longitude of the said address:")
+
+        data = [go.Scattergeo(
+                    #locationmode = 'ISO-3',
+                    lon = [location.longitude,location2.longitude],
+                    lat = [location.latitude,location2.latitude],
+                    mode = 'markers',
+                    marker = dict(
+                        size = 5,
+                        opacity = 0.8,
+                        symbol = 'circle',
+                        line = dict(width=1, color='rgba(102, 102, 102)')
+                    ),
+                    text = [str(ladd1),ladd2],
+                    name = 'Cities'
+                )]
+        fig = go.Figure(data=data)
+        fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0},)
+        # Generate the HTML for the plot
+        plot_html = fig.to_html( include_plotlyjs='cdn')
+        # Add the JavaScript code to the HTML and display it in a QWebEngineView
+        self.web_engine_view.setHtml(plot_html, QUrl(''))
             
     def sentence_search(self,search_term):
-        
         conn = sqlite3.connect(db_dir)
         cursor = conn.cursor()
-
         # Split the query into individual words
         search_term = [search_term]
         clean_sentence = self.cleansing(search_term)
@@ -967,9 +1106,66 @@ class Ui_MainWindow(object):
 
         return results
     
-    
+    def location_search(self,search_term):
+        print("Search Term : "+ search_term)
+        conn = sqlite3.connect(db_dir)
+        cursor = conn.cursor()
 
+        # Split the query into individual words
+        clean_sentence = self.cleansing(search_term)
+        words = self.spacy_process(clean_sentence)
+
+        # Retrieve the documents that contain each word
+        doc_lists = []
+        for word in words:
+            cursor.execute("SELECT Doc_ID, TF_IDF FROM word_frequencies JOIN words ON words.ID = word_frequencies.word_ID WHERE word = ?", (word,))
+            doc_list = cursor.fetchall()
+            doc_lists.append(doc_list)
+
+        # Merge the document lists using the TF-IDF scores
+        doc_scores = {}
+        for doc_list in doc_lists:
+            for doc_id, tf_idf in doc_list:
+                if doc_id in doc_scores:
+                    doc_scores[doc_id] += tf_idf
+                else:
+                    doc_scores[doc_id] = tf_idf
+
+        # Rank the documents by their overall relevance
+        ranked_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
+
+        # Retrieve the locations and titles of the top documents
+        results = []
+        for doc_id, score in ranked_docs:
+            cursor.execute("SELECT location FROM documents WHERE ID = ?", (doc_id,))
+            location = cursor.fetchone()
+            location = location[0].strip("()[]'").replace("'", "").split(", ")
+            title = cursor.execute("SELECT title FROM documents WHERE ID = ?", (doc_id,)).fetchone()[0]
+            results.append((location, title))
+
+        conn.close()
+        return results
     
+    def group_location(self,results):
+        # Group the results by location
+        grouped_results = {}
+        for coords, title in results:
+            for country in coords:
+                if country in grouped_results:
+                    grouped_results[country].append(title)
+                else:
+                    grouped_results[country] = [title]
+
+        # Compute the count of titles for each location
+        count_of_titles = {}
+        for coords, titles in grouped_results.items():
+            count_of_titles[coords] = len(titles)
+
+        # Combine the location, titles, and title count into a single output
+        output_list = []
+        for coords, titles in grouped_results.items():
+            output_list.append((coords, titles, count_of_titles[coords]))
+        
     def spacy_process(self,text):
         
         nlp = spacy.load('en_core_web_sm')
@@ -1407,7 +1603,6 @@ class SpiderThread(QThread):
         for i in self.target_links:
             thread = LinkThread(i, self.depth_value, self.progress_signal, self.count_links_signal, self.each_links_finished)
             self.threads.append(thread)
-            print(i)
             thread.start()
         
         # Wait for all threads to finish before emitting the finished signal
@@ -1876,7 +2071,63 @@ class UpdateThread(QThread):
 
         conn.commit()
 
-    
+
+class DeleteDataThread(QThread):
+    finished = pyqtSignal()
+
+    def __init__(self, link):
+        super().__init__()
+        self.link = link
+
+    def run(self):
+        self.delete_data(self.link)
+        self.finished.emit()
+
+    def delete_data(self,link):
+        conn = sqlite3.connect(db_dir,timeout=10)
+        doc_id = conn.execute('''
+        SELECT id FROM documents WHERE link = ?; ''', (link,)).fetchone()[0]
+        conn.execute('''
+            DELETE FROM documents WHERE link = ?; ''', (link,))
+
+        conn.execute('''
+            DELETE FROM word_frequencies WHERE Doc_ID = ?;''', (doc_id,))
+
+        conn.execute('''
+            DELETE FROM words
+            WHERE NOT EXISTS (SELECT 1 FROM word_frequencies WHERE word_frequencies.word_id = words.id );''')
+        
+        conn.commit()
+        self.update_tf_idf()
+
+    def update_tf_idf(self):
+        conn = sqlite3.connect(db_dir,timeout=3)
+
+        cursor = conn.execute('SELECT COUNT(*) FROM documents')
+        N = cursor.fetchone()[0]
+        
+        cursor = conn.execute('SELECT ID, Word FROM words')
+        words = cursor.fetchall()
+        
+        for word in words:
+            word_id = word[0]
+            word_str = word[1]
+
+            cursor = conn.execute('SELECT Doc_ID, Frequency FROM word_frequencies WHERE Word_ID = ?', (word_id,))
+            doc_freqs = cursor.fetchall()
+
+            df = len(doc_freqs)
+            idf = math.log(N / df)
+
+            for doc_freq in doc_freqs:
+                doc_id = doc_freq[0]
+                tf = doc_freq[1]
+                tf_idf = tf * idf
+                conn.execute('UPDATE word_frequencies SET TF_IDF = ? WHERE Word_ID = ? AND Doc_ID = ?', (tf_idf, word_id, doc_id))
+
+        conn.commit()
+        
+
         
 
 
