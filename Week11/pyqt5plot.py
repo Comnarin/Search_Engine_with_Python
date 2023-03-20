@@ -51,7 +51,8 @@ layout = QVBoxLayout(widget)
 
 # Create the QWebEngineView widget and load the HTML plot
 view = QWebEngineView()
-view.load(QUrl("https://www.google.com"))
+#view.load(QUrl("https://www.google.com"))
+view.setHtml(fig.to_html(include_plotlyjs = 'cdn'))
 layout.addWidget(view)
 
 # Set the widget as the central widget of the main window and show it
