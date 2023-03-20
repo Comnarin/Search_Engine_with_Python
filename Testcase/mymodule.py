@@ -381,7 +381,7 @@ def update_tf_idf():
 
 # %%
 def insert_to_database(doc):
-  conn = sqlite3.connect('inverted_index.db')
+  conn = sqlite3.connect('../week11/inverted_index.db')
   for i in doc:
     conn.execute('''INSERT INTO documents (Link, Title, Body, Location, Ref, Time) VALUES (?, ?, ?, ?, ?, ?);''', (str(i['link']), str(i['title']), str(i['body']), str(i['location']), int(i['ref']), datetime.now()))
     doc_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
@@ -413,10 +413,141 @@ def temp_to_index():
         conn.execute('DELETE FROM temp_link WHERE link = ?; ', (i,))
         conn.commit()
 
-# %%
-# temp_to_index()
 
 # %%
+import ast
+
+def location_search():
+    conn = sqlite3.connect('../week11/inverted_index.db')
+    cursor = conn.cursor()
+
+    # Split the query into individual words
+    search_term = [str(input())]
+    clean_sentence = cleansing(search_term)
+    words = spacy_process(clean_sentence)
+
+    # Retrieve the documents that contain each word
+    doc_lists = []
+    for word in words:
+        cursor.execute("SELECT Doc_ID, TF_IDF FROM word_frequencies JOIN words ON words.ID = word_frequencies.word_ID WHERE word = ?", (word,))
+        doc_list = cursor.fetchall()
+        doc_lists.append(doc_list)
+
+    # Merge the document lists using the TF-IDF scores
+    doc_scores = {}
+    for doc_list in doc_lists:
+        for doc_id, tf_idf in doc_list:
+            if doc_id in doc_scores:
+                doc_scores[doc_id] += tf_idf
+            else:
+                doc_scores[doc_id] = tf_idf
+
+    # Rank the documents by their overall relevance
+    ranked_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
+
+    # Retrieve the links and titles of the top documents
+    results = []
+    for doc_id, score in ranked_docs:
+        cursor.execute("SELECT location FROM documents WHERE ID = ?", (doc_id,))
+        location = cursor.fetchone()
+        location = location[0].strip("()[]'").replace("'", "").split(", ")
+        title = cursor.execute("SELECT title FROM documents WHERE ID = ?", (doc_id,)).fetchone()[0]
+        results.append((location, title))
+
+    conn.close()
+    
 
 
+    return results
 
+# %%
+from geopy.geocoders import Nominatim
+def get_lat_lon(data):
+    geolocator = Nominatim(user_agent="geoapiExercises")
+    try:
+        location = geolocator.geocode(data)
+        latitude,longtitude = location.latitude, location.longitude
+    except:
+        latitude,longtitude = 'Not found','Not found'
+    return (latitude,longtitude)
+
+# %%
+data = location_search()
+print(data)
+result =[]
+for i in data:
+    coordinate = []
+    for j in i[0]:
+        lat,lon =  get_lat_lon(j)
+        coordinate.append([lat,lon])
+    result .append((coordinate,i[1]))
+    
+print(result)
+# %%
+def group(results):
+
+
+    # Group the results by location
+    grouped_results = {}
+    for coords, title in results:
+        for country in coords:
+            if country in grouped_results:
+                grouped_results[country].append(title)
+            else:
+                grouped_results[country] = [title]
+
+    # Compute the count of titles for each location
+    count_of_titles = {}
+    for coords, titles in grouped_results.items():
+        count_of_titles[coords] = len(titles)
+
+    # Combine the location, titles, and title count into a single output
+    output_list = []
+    for coords, titles in grouped_results.items():
+        output_list.append((coords, titles, count_of_titles[coords]))
+
+    return output_list
+        
+# %%
+def sentence_search():
+    conn = sqlite3.connect('../week11/inverted_index.db')
+    cursor = conn.cursor()
+
+    # Split the query into individual words
+    search_term = [str(input())]
+    clean_sentence = cleansing(search_term)
+    words = spacy_process(clean_sentence)
+
+    # Retrieve the documents that contain each word
+    doc_lists = []
+    for word in words:
+        cursor.execute("SELECT Doc_ID, TF_IDF FROM word_frequencies JOIN words ON words.ID = word_frequencies.word_ID WHERE word = ?", (word,))
+        doc_list = cursor.fetchall()
+        doc_lists.append(doc_list)
+
+    # Merge the document lists using the TF-IDF scores
+    doc_scores = {}
+    for doc_list in doc_lists:
+        for doc_id, tf_idf in doc_list:
+            if doc_id in doc_scores:
+                doc_scores[doc_id] += tf_idf
+            else:
+                doc_scores[doc_id] = tf_idf
+
+    # Rank the documents by their overall relevance
+    ranked_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
+    print(ranked_docs)
+
+    # Retrieve the locations and titles of the top documents
+    results = []
+    for doc_id, score in ranked_docs:
+        cursor.execute("SELECT location FROM documents WHERE ID = ?", (doc_id,))
+        location = cursor.fetchone()
+        location = location[0].strip("()[]'").replace("'", "").split(", ")
+        title = cursor.execute("SELECT title FROM documents WHERE ID = ?", (doc_id,)).fetchone()[0]
+        results.append((location, title))
+
+    conn.close()
+
+    return results
+# %%

@@ -4,7 +4,7 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtCore import QThread, pyqtSignal,QUrl
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QUrl
-
+from geopy.geocoders import Nominatim
 import locationtagger
 import pythainlp.util
 from pythainlp.summarize import summarize
@@ -1017,7 +1017,6 @@ class Ui_MainWindow(object):
         Result_search = self.sentence_search(input_value.lower())
         Location_serch = self.location_search(input_value.lower())
         Location_Result = self.group_location(Location_serch)
-        print(Location_Result)
         self.table_showDatabase.setColumnCount(2)
         self.table_showDatabase.setColumnWidth(0,500)
         self.table_showDatabase.setColumnWidth(1,500)
@@ -1112,8 +1111,10 @@ class Ui_MainWindow(object):
         cursor = conn.cursor()
 
         # Split the query into individual words
-        clean_sentence = self.cleansing(search_term)
+        clean_sentence = self.cleansing([search_term])
+        
         words = self.spacy_process(clean_sentence)
+        
 
         # Retrieve the documents that contain each word
         doc_lists = []
@@ -1134,6 +1135,7 @@ class Ui_MainWindow(object):
         # Rank the documents by their overall relevance
         ranked_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
 
+
         # Retrieve the locations and titles of the top documents
         results = []
         for doc_id, score in ranked_docs:
@@ -1144,6 +1146,7 @@ class Ui_MainWindow(object):
             results.append((location, title))
 
         conn.close()
+        print(results)
         return results
     
     def group_location(self,results):
@@ -1165,6 +1168,28 @@ class Ui_MainWindow(object):
         output_list = []
         for coords, titles in grouped_results.items():
             output_list.append((coords, titles, count_of_titles[coords]))
+        print(output_list)
+        num = 0
+        for i in output_list:
+            print(i[0])
+            lat,lon = self.get_lat_lon(i[0])
+            print(lat,lon)
+            i = list(i)
+            i[0] = (lat,lon)
+            i = tuple(i)
+            output_list[num] = i
+            num+=1
+        return output_list
+    
+    def get_lat_lon(self,data):
+        geolocator = Nominatim(user_agent="geoapiExercises")
+        try:
+            location = geolocator.geocode(data)
+            latitude,longtitude = location.latitude, location.longitude
+        except:
+            latitude,longtitude = 'Not found'
+        return (latitude,longtitude)
+        
         
     def spacy_process(self,text):
         
