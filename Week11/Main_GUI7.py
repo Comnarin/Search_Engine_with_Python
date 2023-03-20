@@ -1,5 +1,6 @@
-from PyQt5 import QtCore, QtGui, QtWidgets 
+from PyQt5 import QtCore, QtGui, QtWidgets, QtWebEngineWidgets
 from PyQt5.QtWidgets import QInputDialog, QLineEdit, QListWidgetItem, QMessageBox,QFileDialog,QHeaderView, QTableWidgetItem,QDialog
+from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtCore import QThread, pyqtSignal,QUrl
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QUrl
@@ -399,7 +400,9 @@ class Ui_MainWindow(object):
         self.progressBar_Update.setProperty("value", 0)
         self.progressBar_Remove.setProperty("value", 0)
         
-        
+        # create a QWebEngineView widget
+        self.webView = QtWebEngineWidgets.QWebEngineView()
+
     def load_input_domain(self):
         domainlinks = ['http://www.bbc.com','http://www.thairath.co.th']
         for i in domainlinks:
@@ -908,6 +911,7 @@ class Ui_MainWindow(object):
 
     def OpenLink(self,item):
         link_open = self.table_showDatabase.item(item.row(), item.column())
+        
         if item.column() == 0:
             webbrowser.open(link_open.text())
         
