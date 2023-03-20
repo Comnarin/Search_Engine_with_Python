@@ -1,6 +1,5 @@
-from PyQt5 import QtCore, QtGui, QtWidgets, QtWebEngineWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets 
 from PyQt5.QtWidgets import QInputDialog, QLineEdit, QListWidgetItem, QMessageBox,QFileDialog,QHeaderView, QTableWidgetItem,QDialog
-from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtCore import QThread, pyqtSignal,QUrl
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QUrl
@@ -400,9 +399,7 @@ class Ui_MainWindow(object):
         self.progressBar_Update.setProperty("value", 0)
         self.progressBar_Remove.setProperty("value", 0)
         
-        # create a QWebEngineView widget
-        self.webView = QtWebEngineWidgets.QWebEngineView()
-
+        
     def load_input_domain(self):
         domainlinks = ['http://www.bbc.com','http://www.thairath.co.th']
         for i in domainlinks:
@@ -913,24 +910,6 @@ class Ui_MainWindow(object):
         link_open = self.table_showDatabase.item(item.row(), item.column())
         if item.column() == 0:
             webbrowser.open(link_open.text())
-        '''
-        if item.column() == 0:
-            # create a new dialog
-            dialog = QtWidgets.QDialog(self)
-            dialog.setWindowTitle("Link")
-            dialog.setModal(True)
-            dialog.resize(800, 600)
-            
-            # create a QWebEngineView widget and set it as the central widget of the dialog
-            webview = QtWebEngineWidgets.QWebEngineView(dialog)
-            dialog.setCentralWidget(webview)
-            
-            # load the link into the webview
-            webview.load(QtCore.QUrl(link_open.text()))
-            
-            # show the dialog
-            dialog.exec_()'''
-        
         
 
     def openFileNameDialog(self):
