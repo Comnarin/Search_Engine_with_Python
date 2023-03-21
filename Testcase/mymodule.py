@@ -21,6 +21,8 @@ import math
 # %%
 class spyder:
     def __init__( self ,links,base_url,depth ):
+        if not base_url.startswith('http://') and not base_url.startswith('https://'):
+            base_url = 'http://' + base_url
         self.base_url = base_url
         target_links={}
         for i in links:
@@ -71,15 +73,25 @@ class spyder:
     def check_domain(self,base_url,links):
         result= set()
         for link in links :
-            if link.startswith(base_url):
-                result.add(link)
+            if link.startswith("https"):
+                link = "http" + link[5:]
+                if link.startswith(base_url):
+                    result.add(link)
+            else:
+                if link.startswith(base_url):
+                    result.add(link)
         return result
     
     def check_not_domain(self,base_url,links):
         result= set()
         for link in links :
-            if not link.startswith(base_url):
-                result.add(link)
+            if link.startswith("https"):
+                link = "http" + link[5:]
+                if not link.startswith(base_url):
+                    result.add(link)
+            else:
+                if not link.startswith(base_url):
+                    result.add(link)
         return result
     
     def check_ref(self,links,target_links):
@@ -188,7 +200,7 @@ class Thai:
         self.summarize_result = summarize(self.sentence,n=5)
         return self.summarize_result
     def location(self):
-        self.data = self.get_tokenize()
+        self.data = self.get_word()
         self.location_value = tag_provinces(self.data)
         self.Result_location = [entry for entry in self.location_value if entry[1] == 'B-LOCATION']
         return self.Result_location
@@ -269,7 +281,7 @@ def get_ref():
     domain = conn.execute("SELECT domain_link FROM domain_link ;").fetchall()
     domain = [t[0] for t in domain]
     for i in domain :
-        web = spyder(domain,i,1)
+        web = spyder(domain,i,2)
         ref = web.get_check_ref()
     return ref
 
@@ -402,8 +414,8 @@ def insert_to_database(doc):
 
 # %%
 #เอาเพิ่ม
-def temp_to_index():
-    conn = sqlite3.connect('inverted_index.db')
+def temp_to_index(conn):
+    #conn = sqlite3.connect('inverted_index.db')
     links = conn.execute('SELECT Link FROM temp_link ').fetchall()
     links = [t[0] for t in links]
     ref=get_ref()
@@ -510,7 +522,7 @@ def group(results):
         
 # %%
 def sentence_search():
-    conn = sqlite3.connect('../week11/inverted_index.db')
+    conn = sqlite3.connect('../week12/inverted_index.db')
     cursor = conn.cursor()
 
     # Split the query into individual words
@@ -541,11 +553,9 @@ def sentence_search():
     # Retrieve the locations and titles of the top documents
     results = []
     for doc_id, score in ranked_docs:
-        cursor.execute("SELECT location FROM documents WHERE ID = ?", (doc_id,))
-        location = cursor.fetchone()
-        location = location[0].strip("()[]'").replace("'", "").split(", ")
-        title = cursor.execute("SELECT title FROM documents WHERE ID = ?", (doc_id,)).fetchone()[0]
-        results.append((location, title))
+            cursor.execute("SELECT Link, Title FROM documents WHERE ID = ?", (doc_id,))
+            link, title = cursor.fetchone()
+            results.append((link, title))
 
     conn.close()
 
