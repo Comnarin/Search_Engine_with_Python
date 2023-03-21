@@ -171,7 +171,7 @@ class Ui_MainWindow(object):
         font.setPointSize(13)
         self.progressBar.setFont(font)
         self.progressBar.setLocale(QtCore.QLocale(QtCore.QLocale.English, QtCore.QLocale.UnitedStates))
-        self.progressBar.setProperty("value", 24)
+        self.progressBar.setProperty("value", 0)
         self.progressBar.setAlignment(QtCore.Qt.AlignCenter)
         self.progressBar.setObjectName("progressBar")
         self.verticalLayout_4.addWidget(self.progressBar)
@@ -274,7 +274,7 @@ class Ui_MainWindow(object):
         self.gridLayout.addWidget(self.Button_update, 1, 4, 1, 1)
         self.progressBar_Update = QtWidgets.QProgressBar(self.tab_edit)
         self.progressBar_Update.setLocale(QtCore.QLocale(QtCore.QLocale.English, QtCore.QLocale.Kenya))
-        self.progressBar_Update.setProperty("value", 24)
+        self.progressBar_Update.setProperty("value", 0)
         self.progressBar_Update.setAlignment(QtCore.Qt.AlignCenter)
         self.progressBar_Update.setObjectName("progressBar_Update")
         self.gridLayout.addWidget(self.progressBar_Update, 2, 2, 1, 1)
@@ -412,7 +412,7 @@ class Ui_MainWindow(object):
         self.webView = QtWebEngineWidgets.QWebEngineView()
 
     def load_input_domain(self):
-        domainlinks = ['http://www.bbc.com','http://www.thairath.co.th']
+        domainlinks = []
         for i in domainlinks:
             self.listWidget.addItem(i)
         self.listWidget.setCurrentRow(0)
@@ -458,7 +458,6 @@ class Ui_MainWindow(object):
         # Record the start time
         self.start_time = time.time()
         self.textBrowser.append("Starting Scrap ..........")
-        self.progressBar.setProperty("value", 10)
         global target_links 
         target_links = []
         for i in range(self.listWidget.count()):
@@ -617,18 +616,14 @@ class Ui_MainWindow(object):
         self.Button_RESUME.clicked.connect(self.handle_resume_button)
 
     def create_db(self,db_dir):
-        
         conn = sqlite3.connect(db_dir)
-
         # Create tables for words, documents, and word frequencies
-
         conn.execute('''
         CREATE TABLE words (
             ID INTEGER PRIMARY KEY,
             Word TEXT NOT NULL UNIQUE
         );
         ''')
-
         conn.execute('''
         CREATE TABLE documents (
             ID INTEGER PRIMARY KEY,
@@ -640,7 +635,6 @@ class Ui_MainWindow(object):
             Time TEXT
         );
         ''')
-
         conn.execute('''
         CREATE TABLE word_frequencies (
             Word_ID INTEGER ,
@@ -666,7 +660,6 @@ class Ui_MainWindow(object):
         );
         ''')
         conn.commit()
-
     def clicked_Index(self):
         self.textBrowser.clear()
         self.progressBar.setProperty("value", 0)
