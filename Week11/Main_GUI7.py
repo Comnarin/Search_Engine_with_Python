@@ -1012,7 +1012,6 @@ class Ui_MainWindow(object):
         
     def search_input(self):
         input_value = self.Search_input.toPlainText()
-        
         # Create and start SentenceSearchThread
         self.sentence_search_thread = SentenceSearchThread(input_value)
         self.sentence_search_thread.result_found.connect(self.show_sentence_search_result)
@@ -1023,6 +1022,15 @@ class Ui_MainWindow(object):
         self.location_search_thread.location_result_found.connect(self.plot_spatial)
         self.location_search_thread.start()
         
+        #Create and start word_frequencyThread
+        self.word_frequency_thread = word_frequency_searchThread(input_value)
+        self.word_frequency_thread.result_location.connect(self.show_word_frequency)
+        self.word_frequency_thread.start()
+
+    def show_word_frequency(self,result_word_frequency):
+        #print(result_word_frequency)  
+        print("mossZmossZ")
+
     def show_sentence_search_result(self, result_search):
         self.table_showDatabase.setColumnCount(2)
         self.table_showDatabase.setColumnWidth(0,500)
@@ -1031,11 +1039,8 @@ class Ui_MainWindow(object):
         for row in range(len(result_search)):
             for col in range(len(result_search[0])):
                 self.table_showDatabase.setItem(row, col, QtWidgets.QTableWidgetItem(str(result_search[row][col])))
-            
+                 
     def plot_spatial(self,location_result):
-        massage_spatial= QMessageBox()
-        massage_spatial.setText("Spatial is ready to show")
-        massage_spatial.exec_()
         lat = []
         lon =[]
         title = []
@@ -1045,7 +1050,7 @@ class Ui_MainWindow(object):
             lon.append(i[0][1])
             title.append(i[1])
             count.append(i[-1])
-        print(count)
+        print(title)
         data = [go.Scattergeo(
                     #locationmode = 'ISO-3',
                     lon = lon,
@@ -1067,7 +1072,8 @@ class Ui_MainWindow(object):
         # Add the JavaScript code to the HTML and display it in a QWebEngineView
         self.web_engine_view.setHtml(plot_html, QUrl(''))
             
-        
+    
+
     def spacy_process(self,text):
         
         nlp = spacy.load('en_core_web_sm')
@@ -1247,7 +1253,6 @@ class Ui_MainWindow(object):
                 word = thai_nlp.word
                 location = 'Thailand'
                 new_list = [s.strip().replace('"', '') for s in word if s.strip()]
-                print(new_list)
                 while '' in new_list:
                     new_list.remove('')
                 word = self.get_word(new_list)
@@ -1486,6 +1491,103 @@ class IndexingThread(QThread):
         except:
             location = ['None']
         return location 
+
+class word_frequency_searchThread(QThread):
+    result_location = pyqtSignal(list)
+
+    def __init__(self, input_value):
+        super().__init__()
+        self.input_value = input_value
+
+    def run(self):
+        result_location = self.word_frequency_search(self.input_value.lower())
+        self.result_location.emit(result_location)
+
+    def word_frequency_search(self,search_term):
+        conn = sqlite3.connect(db_dir)
+        cursor = conn.cursor()
+
+        # Split the query into individual words
+        clean_sentence = self.cleansing([search_term])
+        words = self.spacy_process(clean_sentence)
+       
+        # Retrieve the documents that contain each word
+        doc_lists = []
+        for word in words:
+            cursor.execute("SELECT Doc_ID, Frequency FROM word_frequencies JOIN words ON words.ID = word_frequencies.word_ID WHERE word = ?", (word,))
+            doc_list = cursor.fetchall()
+            doc_lists.append(doc_list)
+       
+        # Merge the document lists using the frequency scores
+        doc_scores = {}
+        for doc_list in doc_lists:
+            for doc_id, frequency in doc_list:
+                if doc_id in doc_scores:
+                    doc_scores[doc_id] += frequency
+                else:
+                    doc_scores[doc_id] = frequency
+      
+        # Rank the documents by the number of search words they contain
+        ranked_docs = []
+        for doc_id, score in doc_scores.items():
+            cursor.execute("SELECT COUNT(*) FROM word_frequencies WHERE Doc_ID = ?", (doc_id,))
+            num_words = cursor.fetchone()[0]
+            num_match_words = sum(1 for word in words if cursor.execute("SELECT COUNT(*) FROM word_frequencies JOIN words ON words.ID = word_frequencies.word_ID WHERE Doc_ID = ? AND word = ?", (doc_id, word)).fetchone()[0] > 0)
+            rank_score = num_match_words / num_words
+            ranked_docs.append((doc_id, rank_score))
+
+        # Retrieve the links, titles, word frequencies, and search words of the top documents
+        results = []
+        for doc_id, rank_score in sorted(ranked_docs, key=lambda x: x[1], reverse=True):
+            cursor.execute("SELECT link FROM documents WHERE ID = ?", (doc_id,))
+            link = cursor.fetchone()[0]
+            title = cursor.execute("SELECT title FROM documents WHERE ID = ?", (doc_id,)).fetchone()[0]
+            word_freqs = {}
+            for word in words:
+                cursor.execute("SELECT Frequency  FROM word_frequencies JOIN words ON words.ID = word_frequencies.word_ID WHERE Doc_ID = ? AND word = ?", (doc_id, word))
+                frequency = cursor.fetchone()
+                if frequency:
+                    word_freqs[word] = frequency[0]
+            results.append((link, title, word_freqs))
+
+        conn.close()
+        return results
+
+    def cleansing(self,body):
+        for i in body:
+            output = i.replace('\n', '  ').replace('\xa0', '  ').replace('®', ' ').replace(';', ' ')
+            output = " ".join(output.split())
+        return output
+    
+    def spacy_process(self,text):
+        
+        nlp = spacy.load('en_core_web_sm')
+        doc = nlp(text)
+        
+    #Tokenization and lemmatization 
+        lemma_list = []
+        for token in doc:
+            lemma_list.append(token.lemma_)
+        #print("Tokenize+Lemmatize:")
+        #print(lemma_list)
+        
+        #Filter the stopword
+        filtered_sentence =[] 
+        for word in lemma_list:
+            lexeme = nlp.vocab[word]
+            if lexeme.is_stop == False:
+                filtered_sentence.append(word) 
+        
+        #Remove punctuation
+        punctuations="?:!.,;"
+        for word in filtered_sentence:
+            if word in punctuations:
+                filtered_sentence.remove(word)
+        #print(" ")
+        #3print("Remove stopword & punctuation: ")
+        #print(filtered_sentence)
+        return filtered_sentence
+
 
 class SentenceSearchThread(QThread):
     result_found = pyqtSignal(list)

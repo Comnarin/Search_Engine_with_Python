@@ -911,26 +911,9 @@ class Ui_MainWindow(object):
 
     def OpenLink(self,item):
         link_open = self.table_showDatabase.item(item.row(), item.column())
+        
         if item.column() == 0:
             webbrowser.open(link_open.text())
-        '''
-        if item.column() == 0:
-            # create a new dialog
-            dialog = QtWidgets.QDialog(self)
-            dialog.setWindowTitle("Link")
-            dialog.setModal(True)
-            dialog.resize(800, 600)
-            
-            # create a QWebEngineView widget and set it as the central widget of the dialog
-            webview = QtWebEngineWidgets.QWebEngineView(dialog)
-            dialog.setCentralWidget(webview)
-            
-            # load the link into the webview
-            webview.load(QtCore.QUrl(link_open.text()))
-            
-            # show the dialog
-            dialog.exec_()'''
-        
         
 
     def openFileNameDialog(self):
@@ -1012,12 +995,10 @@ class Ui_MainWindow(object):
         
     def search_input(self):
         input_value = self.Search_input.toPlainText()
-        print(input_value.lower())
         Result_search = []
         Result_search = self.sentence_search(input_value.lower())
         Location_serch = self.location_search(input_value.lower())
         Location_Result = self.group_location(Location_serch)
-        print(Location_Result)
         self.table_showDatabase.setColumnCount(2)
         self.table_showDatabase.setColumnWidth(0,500)
         self.table_showDatabase.setColumnWidth(1,500)
@@ -1202,9 +1183,8 @@ class Ui_MainWindow(object):
         return output 
 
     def get_word(self,body):
-        words = self.spacy_process(body)
         word_freq = {}
-        for word in words:
+        for word in body:
             if word in word_freq:
                 word_freq[word] += 1
             else:
@@ -1341,14 +1321,12 @@ class Ui_MainWindow(object):
         data_lang,title = self.scrap_tags(url)
         try:
             percent = pythainlp.util.countthai(data_lang[0][0])
-            if percent >50:
-                thai_nlp = self.Thai(data_lang[0]) 
+            if percent > 50:
+                thai_nlp = Thai(data_lang[0]) 
                 word = thai_nlp.word
-                try:
-                    location = 'จ.'+max(thai_nlp.get_location().keys())
-                except:
-                    location = 'Thailand'
+                location = 'Thailand'
                 new_list = [s.strip().replace('"', '') for s in word if s.strip()]
+                print(new_list)
                 while '' in new_list:
                     new_list.remove('')
                 word = self.get_word(new_list)
@@ -1356,13 +1334,16 @@ class Ui_MainWindow(object):
             else:
                 clean_body=self.cleansing(data_lang)
                 body = self.cleansing(data_lang)
-                word = self.get_word(body)
+                word = self.spacy_process(body)
+                word = self.get_word(word)
                 location = self.eng_location(data_lang,title)
                 return clean_body,word,title,location
+        
         except:
             clean_body=self.cleansing(data_lang)
             body = self.cleansing(data_lang)
-            word = self.get_word(body)
+            word = self.spacy_process(body)
+            word = self.get_word(word)
             location = self.eng_location(data_lang,title)
             return clean_body,word,title,location
         
@@ -1486,14 +1467,12 @@ class IndexingThread(QThread):
         data_lang,title = self.scrap_tags(url)
         try:
             percent = pythainlp.util.countthai(data_lang[0][0])
-            if percent >50:
-                thai_nlp = self.Thai(data_lang[0]) 
+            if percent > 50:
+                thai_nlp = Thai(data_lang[0]) 
                 word = thai_nlp.word
-                try:
-                    location = 'จ.'+max(thai_nlp.get_location().keys())
-                except:
-                    location = 'Thailand'
+                location = 'Thailand'
                 new_list = [s.strip().replace('"', '') for s in word if s.strip()]
+                print(new_list)
                 while '' in new_list:
                     new_list.remove('')
                 word = self.get_word(new_list)
@@ -1501,13 +1480,16 @@ class IndexingThread(QThread):
             else:
                 clean_body=self.cleansing(data_lang)
                 body = self.cleansing(data_lang)
-                word = self.get_word(body)
+                word = self.spacy_process(body)
+                word = self.get_word(word)
                 location = self.eng_location(data_lang,title)
                 return clean_body,word,title,location
+        
         except:
             clean_body=self.cleansing(data_lang)
             body = self.cleansing(data_lang)
-            word = self.get_word(body)
+            word = self.spacy_process(body)
+            word = self.get_word(word)
             location = self.eng_location(data_lang,title)
             return clean_body,word,title,location
         
@@ -1534,9 +1516,8 @@ class IndexingThread(QThread):
         return output 
 
     def get_word(self,body):
-        words = self.spacy_process(body)
         word_freq = {}
-        for word in words:
+        for word in body:
             if word in word_freq:
                 word_freq[word] += 1
             else:
@@ -1823,8 +1804,8 @@ class Thai:
         self.summarize_result =[]
         self.summarize_result = summarize(self.sentence,n=5)
         return self.summarize_result
-    def location(self):
-        self.data = self.get_tokenize()
+    def get_location(self):
+        self.data = self.get_word()
         self.location_value = tag_provinces(self.data)
         self.Result_location = [entry for entry in self.location_value if entry[1] == 'B-LOCATION']
         return self.Result_location
@@ -1928,14 +1909,12 @@ class UpdateThread(QThread):
         data_lang,title = self.scrap_tags(url)
         try:
             percent = pythainlp.util.countthai(data_lang[0][0])
-            if percent >50:
-                thai_nlp = self.Thai(data_lang[0]) 
+            if percent > 50:
+                thai_nlp = Thai(data_lang[0]) 
                 word = thai_nlp.word
-                try:
-                    location = 'จ.'+max(thai_nlp.get_location().keys())
-                except:
-                    location = 'Thailand'
+                location = 'Thailand'
                 new_list = [s.strip().replace('"', '') for s in word if s.strip()]
+                print(new_list)
                 while '' in new_list:
                     new_list.remove('')
                 word = self.get_word(new_list)
@@ -1943,16 +1922,19 @@ class UpdateThread(QThread):
             else:
                 clean_body=self.cleansing(data_lang)
                 body = self.cleansing(data_lang)
-                word = self.get_word(body)
+                word = self.spacy_process(body)
+                word = self.get_word(word)
                 location = self.eng_location(data_lang,title)
                 return clean_body,word,title,location
+        
         except:
             clean_body=self.cleansing(data_lang)
             body = self.cleansing(data_lang)
-            word = self.get_word(body)
+            word = self.spacy_process(body)
+            word = self.get_word(word)
             location = self.eng_location(data_lang,title)
             return clean_body,word,title,location
-        
+    
     def scrap_tags(self,url):
         response = requests.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -1976,9 +1958,8 @@ class UpdateThread(QThread):
         return output 
 
     def get_word(self,body):
-        words = self.spacy_process(body)
         word_freq = {}
-        for word in words:
+        for word in body:
             if word in word_freq:
                 word_freq[word] += 1
             else:
