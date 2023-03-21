@@ -30,6 +30,8 @@ import plotly.graph_objs as go
 import plotly.offline as offline
 from geopy.geocoders import Nominatim
 geolocator = Nominatim(user_agent="geoapiExercises")
+import pandas as pd
+import plotly.express as px
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -358,9 +360,12 @@ class Ui_MainWindow(object):
         self.label_Topkeywords.setFont(font)
         self.label_Topkeywords.setObjectName("label_Topkeywords")
         self.gridLayout_5.addWidget(self.label_Topkeywords, 2, 0, 1, 1)
-        self.graphicsView_Keyword = QtWidgets.QGraphicsView(self.tab_Visualization)
-        self.graphicsView_Keyword.setObjectName("graphicsView_Keyword")
-        self.gridLayout_5.addWidget(self.graphicsView_Keyword, 3, 0, 1, 1)
+
+        self.web_engine_view2 = QWebEngineView(self.tab_Visualization)
+        self.web_engine_view2.setObjectName("web_engine_view2")
+        self.gridLayout_5.addWidget(self.web_engine_view2, 3, 0, 1, 1)
+        self.web_engine_view2.setMinimumSize(982, 355)
+
         self.tabWidget_edit.addTab(self.tab_Visualization, "")
         self.gridLayout_4.addWidget(self.tabWidget_edit, 0, 1, 1, 1)
         MainWindow.setCentralWidget(self.centralwidget)
@@ -441,9 +446,7 @@ class Ui_MainWindow(object):
             del item
 
     def clicked_start(self):
-        
         self.textBrowser.clear()
-        
         self.Button_CRAWLER.setEnabled(False)
         self.Button_ADD.setEnabled(False)
         self.Button_EDIT.setEnabled(False)
@@ -463,12 +466,8 @@ class Ui_MainWindow(object):
             target_links.append(item.text())
         self.Craw_Domain()
         depth_value = self.spinBox_Depth.value()
-
-        
         self.thread = SpiderThread(target_links, depth_value)
-        self.progressBar.setProperty("value", 20)
         self.thread.progress_signal.connect(self.progress_ui)
-        self.progressBar.setProperty("value", 25)
         self.thread.count_links_signal.connect(self.count_links_scraping)
         self.thread.each_links_finished.connect(self.update_label)
         
@@ -691,7 +690,6 @@ class Ui_MainWindow(object):
                     if self.folderpath:
                         break
         self.save_path.setEnabled(False)
-        
         self.textBrowser.clear()
         self.textBrowser.append("Adding Database")
         self.addlinks_into_database()
@@ -916,25 +914,6 @@ class Ui_MainWindow(object):
         link_open = self.table_showDatabase.item(item.row(), item.column())
         if item.column() == 0:
             webbrowser.open(link_open.text())
-        '''
-        if item.column() == 0:
-            # create a new dialog
-            dialog = QtWidgets.QDialog(self)
-            dialog.setWindowTitle("Link")
-            dialog.setModal(True)
-            dialog.resize(800, 600)
-            
-            # create a QWebEngineView widget and set it as the central widget of the dialog
-            webview = QtWebEngineWidgets.QWebEngineView(dialog)
-            dialog.setCentralWidget(webview)
-            
-            # load the link into the webview
-            webview.load(QtCore.QUrl(link_open.text()))
-            
-            # show the dialog
-            dialog.exec_()'''
-        
-        
 
     def openFileNameDialog(self):
         options = QFileDialog.Options()
@@ -951,20 +930,6 @@ class Ui_MainWindow(object):
             self.update_ref()
             self.populate_table()
             
-        '''   
-         # Call method to populate table with data from database
-        try:
-            self.populate_table()
-        except:
-            # create a QMessageBox object
-            alert = QMessageBox()
-            
-            # set the message box text and tyspe of alert
-            alert.setText("database doesn't match!")
-            alert.setIcon(QMessageBox.Warning)
-            
-            # display the alert box  
-            alert.exec_()'''
 
     def populate_table(self):
         #print("DATABASE is conneted")
@@ -1012,6 +977,7 @@ class Ui_MainWindow(object):
         
     def search_input(self):
         input_value = self.Search_input.toPlainText()
+        self.Search_button.setEnabled(False)
         # Create and start SentenceSearchThread
         self.sentence_search_thread = SentenceSearchThread(input_value)
         self.sentence_search_thread.result_found.connect(self.show_sentence_search_result)
@@ -1028,17 +994,47 @@ class Ui_MainWindow(object):
         self.word_frequency_thread.start()
 
     def show_word_frequency(self,result_word_frequency):
-        #print(result_word_frequency)  
-        print("mossZmossZ")
+        link = [data[0] for data in result_word_frequency]
+        words = [list(data[2].keys()) for data in result_word_frequency]
+        count = [list(data[2].values()) for data in result_word_frequency]
+
+        link = [link[i] for i in range(len(result_word_frequency)) for j in range(len(words[i]))]  # repeat each link based on the number of keys in the corresponding dictionary
+
+        words = [word for sublist in words for word in sublist]  
+        count = [count for sublist in count for count in sublist]  
+        #print("mossZmossZ")
+        data = {
+            "Link": link,
+            "Word": words,
+            "Count":count
+            }
+        #load data into a DataFrame object:
+        df = pd.DataFrame(data)
+        df = df.sort_values(by="Count", ascending=False)
+        fig = px.bar(df, x="Link", y="Count", color="Word", pattern_shape="Word")
+        fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0},)
+        # Generate the HTML for the plot
+        plot_html = fig.to_html( include_plotlyjs='cdn')
+        # Add the JavaScript code to the HTML and display it in a QWebEngineView
+        self.web_engine_view2.setHtml(plot_html, QUrl(''))
 
     def show_sentence_search_result(self, result_search):
-        self.table_showDatabase.setColumnCount(2)
-        self.table_showDatabase.setColumnWidth(0,500)
-        self.table_showDatabase.setColumnWidth(1,500)
-        self.table_showDatabase.setRowCount(len(result_search))
-        for row in range(len(result_search)):
-            for col in range(len(result_search[0])):
-                self.table_showDatabase.setItem(row, col, QtWidgets.QTableWidgetItem(str(result_search[row][col])))
+        if result_search == []:
+            error = "Not found"
+            self.table_showDatabase.setColumnCount(1)
+            self.table_showDatabase.setColumnWidth(0,1000)
+            self.table_showDatabase.setRowCount(1)
+            for row in range(1):
+                for col in range(1):
+                    self.table_showDatabase.setItem(row, col, QtWidgets.QTableWidgetItem(str(error)))
+        else:
+            self.table_showDatabase.setColumnCount(2)
+            self.table_showDatabase.setColumnWidth(0,500)
+            self.table_showDatabase.setColumnWidth(1,500)
+            self.table_showDatabase.setRowCount(len(result_search))
+            for row in range(len(result_search)):
+                for col in range(len(result_search[0])):
+                    self.table_showDatabase.setItem(row, col, QtWidgets.QTableWidgetItem(str(result_search[row][col])))
                  
     def plot_spatial(self,location_result):
         lat = []
@@ -1050,7 +1046,6 @@ class Ui_MainWindow(object):
             lon.append(i[0][1])
             title.append(i[1])
             count.append(i[-1])
-        print(title)
         data = [go.Scattergeo(
                     #locationmode = 'ISO-3',
                     lon = lon,
@@ -1071,8 +1066,10 @@ class Ui_MainWindow(object):
         plot_html = fig.to_html( include_plotlyjs='cdn')
         # Add the JavaScript code to the HTML and display it in a QWebEngineView
         self.web_engine_view.setHtml(plot_html, QUrl(''))
-            
-    
+        self.Search_button.setEnabled(True)
+
+    def plot_wordFrequency(self,wordFrequencyResult):
+        print("plot_Word_freq")
 
     def spacy_process(self,text):
         
@@ -1102,7 +1099,6 @@ class Ui_MainWindow(object):
         #3print("Remove stopword & punctuation: ")
         #print(filtered_sentence)
         return filtered_sentence
-
     def cleansing(self,body):
         for i in body:
             output = i.replace('\n', '  ').replace('\xa0', '  ').replace('®', ' ').replace(';', ' ')
@@ -1398,7 +1394,6 @@ class IndexingThread(QThread):
                 word = thai_nlp.word
                 location = 'Thailand'
                 new_list = [s.strip().replace('"', '') for s in word if s.strip()]
-                print(new_list)
                 while '' in new_list:
                     new_list.remove('')
                 word = self.get_word(new_list)
