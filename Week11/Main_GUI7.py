@@ -399,6 +399,9 @@ class Ui_MainWindow(object):
         self.Button_Remove.clicked.connect(self.remove_button_click)
         self.progressBar_Update.setProperty("value", 0)
         self.progressBar_Remove.setProperty("value", 0)
+
+        self.sentence_search_thread = None
+        self.location_search_thread = None
         
         # create a QWebEngineView widget
         self.webView = QtWebEngineWidgets.QWebEngineView()
@@ -1004,60 +1007,63 @@ class Ui_MainWindow(object):
             for col in range(len(documents[0])):
                 item = QtWidgets.QTableWidgetItem(str(documents[row][col]))
                 self.table_showDatabase.setItem(row, col, item)
-
-        
-        print("Database is showing")
         # Close database connection
         conn.close()
         
     def search_input(self):
         input_value = self.Search_input.toPlainText()
-        Result_search = []
-        Result_search = self.sentence_search(input_value.lower())
-        Location_serch = self.location_search(input_value.lower())
-        Location_Result = self.group_location(Location_serch)
+        # Create and start SentenceSearchThread
+        self.sentence_search_thread = SentenceSearchThread(input_value)
+        self.sentence_search_thread.result_found.connect(self.show_sentence_search_result)
+        self.sentence_search_thread.start()
+        
+        # Create and start LocationSearchThread
+        self.location_search_thread = LocationSearchThread(input_value)
+        self.location_search_thread.location_result_found.connect(self.plot_spatial)
+        self.location_search_thread.start()
+        
+        #Create and start word_frequencyThread
+        self.word_frequency_thread = word_frequency_searchThread(input_value)
+        self.word_frequency_thread.result_location.connect(self.show_word_frequency)
+        self.word_frequency_thread.start()
+
+    def show_word_frequency(self,result_word_frequency):
+        #print(result_word_frequency)  
+        print("mossZmossZ")
+
+    def show_sentence_search_result(self, result_search):
         self.table_showDatabase.setColumnCount(2)
         self.table_showDatabase.setColumnWidth(0,500)
         self.table_showDatabase.setColumnWidth(1,500)
-        self.table_showDatabase.setRowCount(0)
-        try:
-            self.table_showDatabase.setColumnCount(len(Result_search[0]))
-            self.table_showDatabase.setRowCount(len(Result_search))
-            for row in range(len(Result_search)):
-                for col in range(len(Result_search[0])):
-                    self.table_showDatabase.setItem(row, col, QtWidgets.QTableWidgetItem(str(Result_search[row][col])))
-            self.plot_spatial(Location_Result)
-        except:
-            error = "Not found"
-            self.table_showDatabase.setColumnCount(1)
-            self.table_showDatabase.setColumnWidth(0,1000)
-            self.table_showDatabase.setRowCount(1)
-            for row in range(1):
-                for col in range(1):
-                    self.table_showDatabase.setItem(row, col, QtWidgets.QTableWidgetItem(str(error)))
-            
-    def plot_spatial(self,title):
+        self.table_showDatabase.setRowCount(len(result_search))
+        for row in range(len(result_search)):
+            for col in range(len(result_search[0])):
+                self.table_showDatabase.setItem(row, col, QtWidgets.QTableWidgetItem(str(result_search[row][col])))
+                 
+    def plot_spatial(self,location_result):
+        lat = []
+        lon =[]
+        title = []
+        count = []
+        for i in location_result:
+            lat.append(i[0][0])
+            lon.append(i[0][1])
+            title.append(i[1])
+            count.append(i[-1])
         print(title)
-        ladd1 = title
-        ladd2 = "China"
-        #print("Location address:",ladd1)
-        location = geolocator.geocode("bangkok")
-        location2 = geolocator.geocode(ladd2)
-        #print("Latitude and Longitude of the said address:")
-
         data = [go.Scattergeo(
                     #locationmode = 'ISO-3',
-                    lon = [location.longitude,location2.longitude],
-                    lat = [location.latitude,location2.latitude],
+                    lon = lon,
+                    lat = lat,
                     mode = 'markers',
                     marker = dict(
                         size = 5,
-                        opacity = 0.8,
+                        opacity = 1,
                         symbol = 'circle',
                         line = dict(width=1, color='rgba(102, 102, 102)')
                     ),
-                    text = [str(ladd1),ladd2],
-                    name = 'Cities'
+                    #marker_color = 'green',
+                    text = title
                 )]
         fig = go.Figure(data=data)
         fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0},)
@@ -1066,130 +1072,8 @@ class Ui_MainWindow(object):
         # Add the JavaScript code to the HTML and display it in a QWebEngineView
         self.web_engine_view.setHtml(plot_html, QUrl(''))
             
-    def sentence_search(self,search_term):
-        conn = sqlite3.connect(db_dir)
-        cursor = conn.cursor()
-        # Split the query into individual words
-        search_term = [search_term]
-        clean_sentence = self.cleansing(search_term)
-        words = self.spacy_process(clean_sentence)
-
-        # Retrieve the documents that contain each word
-        doc_lists = []
-        for word in words:
-            cursor.execute("SELECT Doc_ID, TF_IDF FROM word_frequencies JOIN words ON words.ID = word_frequencies.word_ID WHERE word = ?", (word,))
-            doc_list = cursor.fetchall()
-            doc_lists.append(doc_list)
-
-        # Merge the document lists using the TF-IDF scores
-        doc_scores = {}
-        for doc_list in doc_lists:
-            for doc_id, tf_idf in doc_list:
-                if doc_id in doc_scores:
-                    doc_scores[doc_id] += tf_idf
-                else:
-                    doc_scores[doc_id] = tf_idf
-
-        # Rank the documents by their overall relevance
-        ranked_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
-
-        # Retrieve the links and titles of the top documents
-        results = []
-        for doc_id, score in ranked_docs:
-            cursor.execute("SELECT Link, Title FROM documents WHERE ID = ?", (doc_id,))
-            link, title = cursor.fetchone()
-            results.append((link, title))
-
-        conn.close()
-
-        return results
     
-    def location_search(self,search_term):
-        print("Search Term : "+ search_term)
-        conn = sqlite3.connect(db_dir)
-        cursor = conn.cursor()
 
-        # Split the query into individual words
-        clean_sentence = self.cleansing([search_term])
-        
-        words = self.spacy_process(clean_sentence)
-        
-
-        # Retrieve the documents that contain each word
-        doc_lists = []
-        for word in words:
-            cursor.execute("SELECT Doc_ID, TF_IDF FROM word_frequencies JOIN words ON words.ID = word_frequencies.word_ID WHERE word = ?", (word,))
-            doc_list = cursor.fetchall()
-            doc_lists.append(doc_list)
-
-        # Merge the document lists using the TF-IDF scores
-        doc_scores = {}
-        for doc_list in doc_lists:
-            for doc_id, tf_idf in doc_list:
-                if doc_id in doc_scores:
-                    doc_scores[doc_id] += tf_idf
-                else:
-                    doc_scores[doc_id] = tf_idf
-
-        # Rank the documents by their overall relevance
-        ranked_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
-
-
-        # Retrieve the locations and titles of the top documents
-        results = []
-        for doc_id, score in ranked_docs:
-            cursor.execute("SELECT location FROM documents WHERE ID = ?", (doc_id,))
-            location = cursor.fetchone()
-            location = location[0].strip("()[]'").replace("'", "").split(", ")
-            title = cursor.execute("SELECT title FROM documents WHERE ID = ?", (doc_id,)).fetchone()[0]
-            results.append((location, title))
-
-        conn.close()
-        print(results)
-        return results
-    
-    def group_location(self,results):
-        # Group the results by location
-        grouped_results = {}
-        for coords, title in results:
-            for country in coords:
-                if country in grouped_results:
-                    grouped_results[country].append(title)
-                else:
-                    grouped_results[country] = [title]
-
-        # Compute the count of titles for each location
-        count_of_titles = {}
-        for coords, titles in grouped_results.items():
-            count_of_titles[coords] = len(titles)
-
-        # Combine the location, titles, and title count into a single output
-        output_list = []
-        for coords, titles in grouped_results.items():
-            output_list.append((coords, titles, count_of_titles[coords]))
-        print(output_list)
-        num = 0
-        for i in output_list:
-            print(i[0])
-            lat,lon = self.get_lat_lon(i[0])
-            print(lat,lon)
-            i = list(i)
-            i[0] = (lat,lon)
-            i = tuple(i)
-            output_list[num] = i
-            num+=1
-        return output_list
-    
-    def get_lat_lon(self,data):
-        geolocator = Nominatim(user_agent="geoapiExercises")
-        try:
-            location = geolocator.geocode(data)
-            latitude,longtitude = location.latitude, location.longitude
-        except:
-            latitude,longtitude = 'Not found'
-        return (latitude,longtitude)
-        
-        
     def spacy_process(self,text):
         
         nlp = spacy.load('en_core_web_sm')
@@ -1369,7 +1253,6 @@ class Ui_MainWindow(object):
                 word = thai_nlp.word
                 location = 'Thailand'
                 new_list = [s.strip().replace('"', '') for s in word if s.strip()]
-                print(new_list)
                 while '' in new_list:
                     new_list.remove('')
                 word = self.get_word(new_list)
@@ -1608,7 +1491,317 @@ class IndexingThread(QThread):
         except:
             location = ['None']
         return location 
+
+class word_frequency_searchThread(QThread):
+    result_location = pyqtSignal(list)
+
+    def __init__(self, input_value):
+        super().__init__()
+        self.input_value = input_value
+
+    def run(self):
+        result_location = self.word_frequency_search(self.input_value.lower())
+        self.result_location.emit(result_location)
+
+    def word_frequency_search(self,search_term):
+        conn = sqlite3.connect(db_dir)
+        cursor = conn.cursor()
+
+        # Split the query into individual words
+        clean_sentence = self.cleansing([search_term])
+        words = self.spacy_process(clean_sentence)
+       
+        # Retrieve the documents that contain each word
+        doc_lists = []
+        for word in words:
+            cursor.execute("SELECT Doc_ID, Frequency FROM word_frequencies JOIN words ON words.ID = word_frequencies.word_ID WHERE word = ?", (word,))
+            doc_list = cursor.fetchall()
+            doc_lists.append(doc_list)
+       
+        # Merge the document lists using the frequency scores
+        doc_scores = {}
+        for doc_list in doc_lists:
+            for doc_id, frequency in doc_list:
+                if doc_id in doc_scores:
+                    doc_scores[doc_id] += frequency
+                else:
+                    doc_scores[doc_id] = frequency
+      
+        # Rank the documents by the number of search words they contain
+        ranked_docs = []
+        for doc_id, score in doc_scores.items():
+            cursor.execute("SELECT COUNT(*) FROM word_frequencies WHERE Doc_ID = ?", (doc_id,))
+            num_words = cursor.fetchone()[0]
+            num_match_words = sum(1 for word in words if cursor.execute("SELECT COUNT(*) FROM word_frequencies JOIN words ON words.ID = word_frequencies.word_ID WHERE Doc_ID = ? AND word = ?", (doc_id, word)).fetchone()[0] > 0)
+            rank_score = num_match_words / num_words
+            ranked_docs.append((doc_id, rank_score))
+
+        # Retrieve the links, titles, word frequencies, and search words of the top documents
+        results = []
+        for doc_id, rank_score in sorted(ranked_docs, key=lambda x: x[1], reverse=True):
+            cursor.execute("SELECT link FROM documents WHERE ID = ?", (doc_id,))
+            link = cursor.fetchone()[0]
+            title = cursor.execute("SELECT title FROM documents WHERE ID = ?", (doc_id,)).fetchone()[0]
+            word_freqs = {}
+            for word in words:
+                cursor.execute("SELECT Frequency  FROM word_frequencies JOIN words ON words.ID = word_frequencies.word_ID WHERE Doc_ID = ? AND word = ?", (doc_id, word))
+                frequency = cursor.fetchone()
+                if frequency:
+                    word_freqs[word] = frequency[0]
+            results.append((link, title, word_freqs))
+
+        conn.close()
+        return results
+
+    def cleansing(self,body):
+        for i in body:
+            output = i.replace('\n', '  ').replace('\xa0', '  ').replace('®', ' ').replace(';', ' ')
+            output = " ".join(output.split())
+        return output
     
+    def spacy_process(self,text):
+        
+        nlp = spacy.load('en_core_web_sm')
+        doc = nlp(text)
+        
+    #Tokenization and lemmatization 
+        lemma_list = []
+        for token in doc:
+            lemma_list.append(token.lemma_)
+        #print("Tokenize+Lemmatize:")
+        #print(lemma_list)
+        
+        #Filter the stopword
+        filtered_sentence =[] 
+        for word in lemma_list:
+            lexeme = nlp.vocab[word]
+            if lexeme.is_stop == False:
+                filtered_sentence.append(word) 
+        
+        #Remove punctuation
+        punctuations="?:!.,;"
+        for word in filtered_sentence:
+            if word in punctuations:
+                filtered_sentence.remove(word)
+        #print(" ")
+        #3print("Remove stopword & punctuation: ")
+        #print(filtered_sentence)
+        return filtered_sentence
+
+
+class SentenceSearchThread(QThread):
+    result_found = pyqtSignal(list)
+    
+    def __init__(self, input_value):
+        super().__init__()
+        self.input_value = input_value
+        
+    def run(self):
+        result_search = self.sentence_search(self.input_value.lower())
+        self.result_found.emit(result_search)
+
+    def sentence_search(self,search_term):
+        conn = sqlite3.connect(db_dir)
+        cursor = conn.cursor()
+        # Split the query into individual words
+        search_term = [search_term]
+        clean_sentence = self.cleansing(search_term)
+        words = self.spacy_process(clean_sentence)
+
+        # Retrieve the documents that contain each word
+        doc_lists = []
+        for word in words:
+            cursor.execute("SELECT Doc_ID, TF_IDF FROM word_frequencies JOIN words ON words.ID = word_frequencies.word_ID WHERE word = ?", (word,))
+            doc_list = cursor.fetchall()
+            doc_lists.append(doc_list)
+
+        # Merge the document lists using the TF-IDF scores
+        doc_scores = {}
+        for doc_list in doc_lists:
+            for doc_id, tf_idf in doc_list:
+                if doc_id in doc_scores:
+                    doc_scores[doc_id] += tf_idf
+                else:
+                    doc_scores[doc_id] = tf_idf
+
+        # Rank the documents by their overall relevance
+        ranked_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
+
+        # Retrieve the links and titles of the top documents
+        results = []
+        for doc_id, score in ranked_docs:
+            cursor.execute("SELECT Link, Title FROM documents WHERE ID = ?", (doc_id,))
+            link, title = cursor.fetchone()
+            results.append((link, title))
+
+        conn.close()
+
+        return results
+    
+    def cleansing(self,body):
+        for i in body:
+            output = i.replace('\n', '  ').replace('\xa0', '  ').replace('®', ' ').replace(';', ' ')
+            output = " ".join(output.split())
+        return output
+    
+    def spacy_process(self,text):
+        
+        nlp = spacy.load('en_core_web_sm')
+        doc = nlp(text)
+        
+    #Tokenization and lemmatization 
+        lemma_list = []
+        for token in doc:
+            lemma_list.append(token.lemma_)
+        #print("Tokenize+Lemmatize:")
+        #print(lemma_list)
+        
+        #Filter the stopword
+        filtered_sentence =[] 
+        for word in lemma_list:
+            lexeme = nlp.vocab[word]
+            if lexeme.is_stop == False:
+                filtered_sentence.append(word) 
+        
+        #Remove punctuation
+        punctuations="?:!.,;"
+        for word in filtered_sentence:
+            if word in punctuations:
+                filtered_sentence.remove(word)
+        #print(" ")
+        #3print("Remove stopword & punctuation: ")
+        #print(filtered_sentence)
+        return filtered_sentence
+
+class LocationSearchThread(QThread):
+    location_result_found = pyqtSignal(list)
+    
+    def __init__(self, input_value):
+        super().__init__()
+        self.input_value = input_value
+        
+    def run(self):
+        location_serch = self.location_search(self.input_value.lower())
+        location_result = self.group_location(location_serch)
+        self.location_result_found.emit(location_result)
+
+    def location_search(self,search_term):
+        conn = sqlite3.connect(db_dir)
+        cursor = conn.cursor()
+
+        # Split the query into individual words
+        clean_sentence = self.cleansing([search_term])
+        
+        words = self.spacy_process(clean_sentence)
+        
+
+        # Retrieve the documents that contain each word
+        doc_lists = []
+        for word in words:
+            cursor.execute("SELECT Doc_ID, TF_IDF FROM word_frequencies JOIN words ON words.ID = word_frequencies.word_ID WHERE word = ?", (word,))
+            doc_list = cursor.fetchall()
+            doc_lists.append(doc_list)
+
+        # Merge the document lists using the TF-IDF scores
+        doc_scores = {}
+        for doc_list in doc_lists:
+            for doc_id, tf_idf in doc_list:
+                if doc_id in doc_scores:
+                    doc_scores[doc_id] += tf_idf
+                else:
+                    doc_scores[doc_id] = tf_idf
+
+        # Rank the documents by their overall relevance
+        ranked_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
+
+
+        # Retrieve the locations and titles of the top documents
+        results = []
+        for doc_id, score in ranked_docs:
+            cursor.execute("SELECT location FROM documents WHERE ID = ?", (doc_id,))
+            location = cursor.fetchone()
+            location = location[0].strip("()[]'").replace("'", "").split(", ")
+            title = cursor.execute("SELECT title FROM documents WHERE ID = ?", (doc_id,)).fetchone()[0]
+            results.append((location, title))
+
+        conn.close()
+        return results
+
+    def cleansing(self,body):
+        for i in body:
+            output = i.replace('\n', '  ').replace('\xa0', '  ').replace('®', ' ').replace(';', ' ')
+            output = " ".join(output.split())
+        return output 
+    
+    
+    
+    def group_location(self,results):
+        # Group the results by location
+        grouped_results = {}
+        for coords, title in results:
+            for country in coords:
+                if country in grouped_results:
+                    grouped_results[country].append(title)
+                else:
+                    grouped_results[country] = [title]
+
+        # Compute the count of titles for each location
+        count_of_titles = {}
+        for coords, titles in grouped_results.items():
+            count_of_titles[coords] = len(titles)
+
+        # Combine the location, titles, and title count into a single output
+        output_list = []
+        for coords, titles in grouped_results.items():
+            output_list.append((coords, titles, count_of_titles[coords]))
+        num = 0
+        for i in output_list:
+            lat,lon = self.get_lat_lon(i[0])
+            i = list(i)
+            i[0] = (lat,lon)
+            i = tuple(i)
+            output_list[num] = i
+            num+=1
+        return output_list
+    
+    def get_lat_lon(self,data):
+        geolocator = Nominatim(user_agent="geoapiExercises")
+        try:
+            location = geolocator.geocode(data)
+            latitude,longtitude = location.latitude, location.longitude
+        except:
+            latitude,longtitude = 'Not found'
+        return (latitude,longtitude)
+    
+    def spacy_process(self,text):
+        
+        nlp = spacy.load('en_core_web_sm')
+        doc = nlp(text)
+        
+    #Tokenization and lemmatization 
+        lemma_list = []
+        for token in doc:
+            lemma_list.append(token.lemma_)
+        #print("Tokenize+Lemmatize:")
+        #print(lemma_list)
+        
+        #Filter the stopword
+        filtered_sentence =[] 
+        for word in lemma_list:
+            lexeme = nlp.vocab[word]
+            if lexeme.is_stop == False:
+                filtered_sentence.append(word) 
+        
+        #Remove punctuation
+        punctuations="?:!.,;"
+        for word in filtered_sentence:
+            if word in punctuations:
+                filtered_sentence.remove(word)
+        #print(" ")
+        #3print("Remove stopword & punctuation: ")
+        #print(filtered_sentence)
+        return filtered_sentence
+
     
 class SpiderThread(QThread):
     finished = pyqtSignal(list)
@@ -1957,7 +2150,6 @@ class UpdateThread(QThread):
                 word = thai_nlp.word
                 location = 'Thailand'
                 new_list = [s.strip().replace('"', '') for s in word if s.strip()]
-                print(new_list)
                 while '' in new_list:
                     new_list.remove('')
                 word = self.get_word(new_list)
